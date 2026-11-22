@@ -15,7 +15,6 @@ import {
   type ItemMetadata,
 } from "@/lib/supabase/metadata/schema";
 import { createBrowserClientInstance } from "@/lib/supabase/client";
-import { saveCollectionDriveFolderUrl } from "@/lib/supabase/queries/collection-drive-folder";
 import { listUserItemMetadataRecords } from "@/lib/supabase/queries/items";
 import type { Collection } from "@/lib/supabase/types/collection";
 import type { Item } from "@/lib/supabase/types/item";
@@ -32,7 +31,6 @@ type ImportGoogleDriveModalProps = {
   suggestionItems: Item[];
   onClose: () => void;
   onImported?: (imported: Item[], updated?: Item[]) => void;
-  onCollectionUpdated?: (collection: Collection) => void;
 };
 
 export function ImportGoogleDriveModal({
@@ -44,7 +42,6 @@ export function ImportGoogleDriveModal({
   suggestionItems,
   onClose,
   onImported,
-  onCollectionUpdated,
 }: ImportGoogleDriveModalProps) {
   const collectionId = collection.id;
   const titleId = useId();
@@ -148,20 +145,6 @@ export function ImportGoogleDriveModal({
         batchMetadata,
         onProgress: setProgress,
       });
-
-      const trimmedFolder = folderUrl.trim();
-      if (trimmedFolder) {
-        const supabase = createBrowserClientInstance();
-        const { data: updatedCollection } = await saveCollectionDriveFolderUrl(
-          supabase,
-          collectionId,
-          collection.metadata,
-          trimmedFolder,
-        );
-        if (updatedCollection) {
-          onCollectionUpdated?.(updatedCollection);
-        }
-      }
 
       if (
         result.errors.length > 0 &&

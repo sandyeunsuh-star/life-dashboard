@@ -186,8 +186,8 @@ export function CollectionMetadataFields({
           className={formInputMdClass}
         />
         <p className="text-xs text-zinc-600">
-          Link to the kit&apos;s master folder in Google Drive. Auto-filled when
-          you import from a folder.
+          Link to the kit&apos;s main folder in Google Drive (set manually so
+          subfolder imports won&apos;t overwrite it).
         </p>
       </div>
     </div>

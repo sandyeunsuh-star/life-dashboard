@@ -593,7 +593,6 @@ export function CollectionDetail({
         collectionMetadata={albumMetadata}
         suggestionItems={items}
         onClose={() => setImportOpen(false)}
-        onCollectionUpdated={setCollection}
         onImported={(imported, updated) => {
           setItems((prev) => {
             let next = prev;
