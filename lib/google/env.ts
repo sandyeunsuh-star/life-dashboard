@@ -13,8 +13,23 @@ export function getGoogleClientSecret(): string {
   return requireEnv("GOOGLE_CLIENT_SECRET", process.env.GOOGLE_CLIENT_SECRET);
 }
 
-export function getGoogleRedirectUri(): string {
-  return requireEnv("GOOGLE_REDIRECT_URI", process.env.GOOGLE_REDIRECT_URI);
+/** Fallback redirect URI when no request context (token refresh only). */
+export function getGoogleRedirectUriFallback(): string {
+  const fromPublic = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (fromPublic) {
+    return `${fromPublic.replace(/\/$/, "")}/api/auth/google/callback`;
+  }
+  const vercel = process.env.VERCEL_URL?.trim();
+  if (vercel) {
+    return `https://${vercel}/api/auth/google/callback`;
+  }
+  const legacy = process.env.GOOGLE_REDIRECT_URI?.trim();
+  if (legacy) {
+    return legacy;
+  }
+  throw new Error(
+    "Set NEXT_PUBLIC_SITE_URL (recommended) or GOOGLE_REDIRECT_URI for Google OAuth",
+  );
 }
 
 export const GOOGLE_DRIVE_READONLY_SCOPE =

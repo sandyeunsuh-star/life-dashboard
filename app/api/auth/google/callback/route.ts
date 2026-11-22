@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { requireSupabaseUser } from "@/lib/api/require-user";
+import { googleOAuthRedirectUri } from "@/lib/google/request-origin";
 import {
   exchangeGoogleAuthCode,
   serializeGoogleTokens,
@@ -48,7 +49,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const tokens = await exchangeGoogleAuthCode(code);
+    const redirectUri = googleOAuthRedirectUri(request);
+    const tokens = await exchangeGoogleAuthCode(code, redirectUri);
     if (!tokens.access_token) {
       return NextResponse.json(
         { error: "Google did not return an access token" },

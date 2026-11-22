@@ -3,20 +3,20 @@ import { google } from "googleapis";
 import {
   getGoogleClientId,
   getGoogleClientSecret,
-  getGoogleRedirectUri,
+  getGoogleRedirectUriFallback,
   GOOGLE_DRIVE_READONLY_SCOPE,
 } from "./env";
 
-export function createGoogleOAuth2Client() {
+export function createGoogleOAuth2Client(redirectUri?: string) {
   return new google.auth.OAuth2(
     getGoogleClientId(),
     getGoogleClientSecret(),
-    getGoogleRedirectUri(),
+    redirectUri ?? getGoogleRedirectUriFallback(),
   );
 }
 
-export function getGoogleConsentUrl(state: string): string {
-  const client = createGoogleOAuth2Client();
+export function getGoogleConsentUrl(state: string, redirectUri: string): string {
+  const client = createGoogleOAuth2Client(redirectUri);
   return client.generateAuthUrl({
     access_type: "offline",
     prompt: "consent",
@@ -26,8 +26,11 @@ export function getGoogleConsentUrl(state: string): string {
   });
 }
 
-export async function exchangeGoogleAuthCode(code: string) {
-  const client = createGoogleOAuth2Client();
+export async function exchangeGoogleAuthCode(
+  code: string,
+  redirectUri: string,
+) {
+  const client = createGoogleOAuth2Client(redirectUri);
   const { tokens } = await client.getToken(code);
   client.setCredentials(tokens);
   return tokens;

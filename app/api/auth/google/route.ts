@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { googleOAuthRedirectUri } from "@/lib/google/request-origin";
 import { getGoogleConsentUrl } from "@/lib/google/oauth";
 import { requireSupabaseUser } from "@/lib/api/require-user";
 
@@ -17,6 +18,7 @@ export async function GET(request: NextRequest) {
     "utf8",
   ).toString("base64url");
 
-  const consentUrl = getGoogleConsentUrl(state);
+  const redirectUri = googleOAuthRedirectUri(request);
+  const consentUrl = getGoogleConsentUrl(state, redirectUri);
   return NextResponse.redirect(consentUrl);
 }
