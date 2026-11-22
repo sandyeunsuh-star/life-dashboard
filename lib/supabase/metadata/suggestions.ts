@@ -1,4 +1,6 @@
+import type { CollectionMetadataRecord } from "../types/collection-metadata";
 import type { Item } from "../types/item";
+import { parseCollectionMetadata } from "./collection-schema";
 import { DEFAULT_ITEM_TYPES } from "./constants";
 import { parseItemMetadata } from "./schema";
 
@@ -16,7 +18,7 @@ function uniqueSorted(values: Iterable<string>): string[] {
 }
 
 export function getMetadataSuggestionsFromMetadataRecords(
-  records: Record<string, string>[],
+  records: (CollectionMetadataRecord | Record<string, string>)[],
 ): ItemMetadataSuggestions {
   const companies = new Set<string>();
   const designers = new Set<string>();
@@ -24,7 +26,11 @@ export function getMetadataSuggestionsFromMetadataRecords(
   const published = new Set<string>();
 
   for (const record of records) {
-    const meta = parseItemMetadata(record);
+    const album = parseCollectionMetadata(record as CollectionMetadataRecord);
+    const meta = parseItemMetadata(record as Record<string, string>);
+    if (album.company) companies.add(album.company);
+    if (album.designer) designers.add(album.designer);
+    if (album.published) published.add(album.published);
     if (meta.company) companies.add(meta.company);
     if (meta.designer) designers.add(meta.designer);
     if (meta.type) types.add(meta.type);

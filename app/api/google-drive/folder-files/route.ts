@@ -5,9 +5,12 @@ import { requireSupabaseUser } from "@/lib/api/require-user";
 import {
   extractGoogleDriveFolderId,
   listImageFilesInFolder,
+  type DriveImageFile,
 } from "@/lib/google/drive";
 import { getGoogleDriveClient } from "@/lib/google/require-google-auth";
-import { listItemDriveUrlsInCollection } from "@/lib/supabase/queries/items";
+import { parseItemMetadata } from "@/lib/supabase/metadata/schema";
+import { titleStillEqualsRawFileName } from "@/lib/supabase/metadata/clean-item-title";
+import { listItemsForDriveFolderSync } from "@/lib/supabase/queries/items";
 
 type FolderFilesBody = {
   folderUrl?: string;
@@ -59,7 +62,7 @@ export async function POST(request: Request) {
   try {
     const files = await listImageFilesInFolder(drive, folderId);
 
-    const { data: existingDriveUrls, error } = await listItemDriveUrlsInCollection(
+    const { data: existingItems, error } = await listItemsForDriveFolderSync(
       auth.supabase!,
       body.collectionId,
     );
@@ -71,17 +74,36 @@ export async function POST(request: Request) {
       );
     }
 
-    const existingSet = new Set(existingDriveUrls ?? []);
-    const importable = files.filter((file) => {
+    const importable: DriveImageFile[] = [];
+    const titleUpdates: { itemId: string; fileName: string }[] = [];
+    let skippedDuplicates = 0;
+
+    for (const file of files) {
       const link = file.webViewLink;
-      return !link || !existingSet.has(link);
-    });
-    const skipped = files.length - importable.length;
+      const match = (existingItems ?? []).find((item) => {
+        if (link && item.drive_url === link) {
+          return true;
+        }
+        const meta = parseItemMetadata(item.metadata);
+        return meta.file_name?.trim() === file.name.trim();
+      });
+
+      if (!match) {
+        importable.push(file);
+        continue;
+      }
+
+      if (titleStillEqualsRawFileName(match, file.name)) {
+        titleUpdates.push({ itemId: match.id, fileName: file.name });
+      }
+      skippedDuplicates += 1;
+    }
 
     return Response.json({
       folderId,
       files: importable,
-      skippedDuplicates: skipped,
+      titleUpdates,
+      skippedDuplicates,
       totalInFolder: files.length,
     });
   } catch (cause) {

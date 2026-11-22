@@ -7,9 +7,9 @@ import { useEffect, useId, useRef, useState } from "react";
 import { ItemMetadataFields } from "@/app/collections/[slug]/item-metadata-fields";
 import { createBrowserClientInstance } from "@/lib/supabase/client";
 import { formatSupabaseError } from "@/lib/supabase/errors";
-import { parseTagsInput } from "@/lib/supabase/filename";
+import { dedupeTrimmedStrings } from "@/lib/supabase/dedupe-strings";
 import {
-  defaultBatchMetadata,
+  defaultTrackBatchMetadata,
   metadataForNewUpload,
   serializeItemMetadata,
   type ItemMetadata,
@@ -17,12 +17,17 @@ import {
 import { guessItemTitleFromFileName } from "@/lib/supabase/metadata/title-from-filename";
 import { createCollectionItem } from "@/lib/supabase/queries/items";
 import type { Item } from "@/lib/supabase/types/item";
+import { TagInput } from "@/lib/ui/tag-input";
+import { useTagSuggestions } from "@/lib/ui/use-tag-suggestions";
 import { formInputMdClass, formLabelClass } from "@/lib/ui/form-styles";
+import { SaveShortcutHint } from "@/lib/ui/save-shortcut-hint";
+import { useSaveKeyboardShortcut } from "@/lib/ui/use-save-keyboard-shortcut";
 
 type AddItemDrawerProps = {
   open: boolean;
   collectionId: string;
   collectionName: string;
+  collectionMetadata: import("@/lib/supabase/types/collection-metadata").CollectionMetadataRecord;
   suggestionItems: Item[];
   onClose: () => void;
   onCreated?: (item: Item) => void;
@@ -32,6 +37,7 @@ export function AddItemDrawer({
   open,
   collectionId,
   collectionName,
+  collectionMetadata,
   suggestionItems,
   onClose,
   onCreated,
@@ -42,12 +48,18 @@ export function AddItemDrawer({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [driveUrl, setDriveUrl] = useState("");
-  const [tagsInput, setTagsInput] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
+  const tagSuggestions = useTagSuggestions(open, suggestionItems);
   const [batchMetadata, setBatchMetadata] = useState<ItemMetadata>(() =>
-    defaultBatchMetadata(collectionName),
+    defaultTrackBatchMetadata(),
   );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  useSaveKeyboardShortcut(open, loading, () => {
+    formRef.current?.requestSubmit();
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -82,8 +94,8 @@ export function AddItemDrawer({
       setPreviewUrl(null);
       setTitle("");
       setDriveUrl("");
-      setTagsInput("");
-      setBatchMetadata(defaultBatchMetadata(collectionName));
+      setTags([]);
+      setBatchMetadata(defaultTrackBatchMetadata());
       setError(null);
       setLoading(false);
     }
@@ -116,10 +128,7 @@ export function AddItemDrawer({
     setLoading(true);
 
     const metadata = serializeItemMetadata(
-      metadataForNewUpload(collectionName, imageFile.name, {
-        ...batchMetadata,
-        collection: collectionName,
-      }),
+      metadataForNewUpload(imageFile.name, batchMetadata),
     );
 
     const supabase = createBrowserClientInstance();
@@ -128,7 +137,7 @@ export function AddItemDrawer({
       imageFile,
       title,
       driveUrl: driveUrl.trim() || undefined,
-      tags: parseTagsInput(tagsInput),
+      tags: dedupeTrimmedStrings(tags),
       metadata,
     });
 
@@ -194,6 +203,7 @@ export function AddItemDrawer({
         </div>
 
         <form
+          ref={formRef}
           onSubmit={handleSubmit}
           className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6 py-5"
         >
@@ -267,24 +277,21 @@ export function AddItemDrawer({
               />
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="tags" className={formLabelClass}>
-                Tags
-              </label>
-              <input
-                id="tags"
-                value={tagsInput}
-                onChange={(e) => setTagsInput(e.target.value)}
-                className={formInputMdClass}
-                placeholder="floral, vintage, pastel"
-              />
-            </div>
+            <TagInput
+              id="add-item-tags"
+              label="Tags"
+              value={tags}
+              onChange={setTags}
+              suggestions={tagSuggestions}
+              placeholder="Type and press Enter…"
+            />
 
             <ItemMetadataFields
               value={batchMetadata}
               onChange={setBatchMetadata}
-              collectionName={collectionName}
+              collectionMetadata={collectionMetadata}
               suggestionItems={suggestionItems}
+              showOverrides={false}
             />
           </div>
 
@@ -305,9 +312,16 @@ export function AddItemDrawer({
             <button
               type="submit"
               disabled={loading}
-              className="h-11 flex-1 rounded-lg bg-zinc-900 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
+              className="inline-flex h-11 flex-1 items-center justify-center rounded-lg bg-zinc-900 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
             >
-              {loading ? "Saving…" : "Add item"}
+              {loading ? (
+                "Saving…"
+              ) : (
+                <>
+                  Add item
+                  <SaveShortcutHint />
+                </>
+              )}
             </button>
           </div>
         </form>

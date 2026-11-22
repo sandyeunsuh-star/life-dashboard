@@ -24,4 +24,21 @@ export type UpdateItemInput = {
   title: string;
   tags: string[];
   metadata: Record<string, string>;
+  driveUrl?: string | null;
+};
+
+export type BulkUpdateItemsInput = {
+  itemIds: string[];
+  applyType: boolean;
+  type?: string;
+  applyTagsAdd: boolean;
+  tagsToAdd: string[];
+  applyTagsReplace: boolean;
+  tagsReplace: string[];
+  applyCompany: boolean;
+  company?: string;
+  applyDesigner: boolean;
+  designer?: string;
+  applyPublished: boolean;
+  published?: string;
 };

@@ -6,7 +6,10 @@ import {
   type ItemMetadata,
 } from "@/lib/supabase/metadata/schema";
 import { guessItemTitleFromFileName } from "@/lib/supabase/metadata/title-from-filename";
-import { createCollectionItem } from "@/lib/supabase/queries/items";
+import {
+  bulkCleanItemTitles,
+  createCollectionItem,
+} from "@/lib/supabase/queries/items";
 import { createBrowserClientInstance } from "@/lib/supabase/client";
 import type { Item } from "@/lib/supabase/types/item";
 
@@ -15,6 +18,7 @@ import type { DriveImageFile } from "@/lib/google/drive";
 export type SyncDriveFolderInput = {
   collectionId: string;
   collectionName: string;
+  company?: string;
   folderUrl: string;
   tags: string[];
   batchMetadata: ItemMetadata;
@@ -34,6 +38,7 @@ export type SyncProgressInfo = {
 
 type FolderFilesResponse = {
   files: DriveImageFile[];
+  titleUpdates?: { itemId: string; fileName: string }[];
   skippedDuplicates: number;
   totalInFolder: number;
   error?: string;
@@ -42,6 +47,7 @@ type FolderFilesResponse = {
 
 export type SyncDriveFolderResult = {
   imported: Item[];
+  updated: Item[];
   skipped: number;
   failed: number;
   errors: string[];
@@ -85,6 +91,29 @@ export async function syncDriveFolderToCollection(
 
   const supabase = createBrowserClientInstance();
 
+  const titleUpdates = listPayload.titleUpdates ?? [];
+  let updated: Item[] = [];
+  if (titleUpdates.length > 0) {
+    const driveFileNameByItemId = Object.fromEntries(
+      titleUpdates.map((row) => [row.itemId, row.fileName]),
+    );
+    const cleanResult = await bulkCleanItemTitles(supabase, {
+      itemIds: titleUpdates.map((row) => row.itemId),
+      context: {
+        collectionName: input.collectionName,
+        company: input.company,
+      },
+      driveFileNameByItemId,
+    });
+    if (cleanResult.error) {
+      errors.push(
+        `Title cleanup: ${formatSupabaseError(cleanResult.error)}`,
+      );
+    } else {
+      updated = cleanResult.data ?? [];
+    }
+  }
+
   for (let index = 0; index < files.length; index += 1) {
     const file = files[index]!;
     progress?.({
@@ -113,9 +142,10 @@ export async function syncDriveFolderToCollection(
       const { title, file_name } = guessItemTitleFromFileName(
         file.name,
         input.collectionName,
+        { company: input.company },
       );
       const metadata = serializeItemMetadata(
-        metadataForNewUpload(input.collectionName, file_name, input.batchMetadata),
+        metadataForNewUpload(file_name, input.batchMetadata),
       );
 
       const { data, error } = await createCollectionItem(supabase, {
@@ -150,5 +180,5 @@ export async function syncDriveFolderToCollection(
     errors,
   });
 
-  return { imported, skipped, failed, errors };
+  return { imported, updated, skipped, failed, errors };
 }

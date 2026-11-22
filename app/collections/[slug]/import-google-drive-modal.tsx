@@ -4,42 +4,55 @@ import { CloudDownload, X } from "lucide-react";
 import { useEffect, useId, useMemo, useState } from "react";
 
 import { ItemMetadataFields } from "@/app/collections/[slug]/item-metadata-fields";
-import { parseTagsInput } from "@/lib/supabase/filename";
+import { dedupeTrimmedStrings } from "@/lib/supabase/dedupe-strings";
 import {
   syncDriveFolderToCollection,
   type SyncProgressInfo,
 } from "@/lib/supabase/google-drive/sync-folder";
-import { defaultBatchMetadata, type ItemMetadata } from "@/lib/supabase/metadata/schema";
+import { parseCollectionMetadata } from "@/lib/supabase/metadata/collection-schema";
+import {
+  defaultTrackBatchMetadata,
+  type ItemMetadata,
+} from "@/lib/supabase/metadata/schema";
 import { createBrowserClientInstance } from "@/lib/supabase/client";
+import { saveCollectionDriveFolderUrl } from "@/lib/supabase/queries/collection-drive-folder";
 import { listUserItemMetadataRecords } from "@/lib/supabase/queries/items";
+import type { Collection } from "@/lib/supabase/types/collection";
 import type { Item } from "@/lib/supabase/types/item";
+import { TagInput } from "@/lib/ui/tag-input";
+import { useTagSuggestions } from "@/lib/ui/use-tag-suggestions";
 import { formInputMdClass, formLabelClass } from "@/lib/ui/form-styles";
 
 type ImportGoogleDriveModalProps = {
   open: boolean;
-  collectionId: string;
+  collection: Collection;
   collectionSlug: string;
   collectionName: string;
+  collectionMetadata: import("@/lib/supabase/types/collection-metadata").CollectionMetadataRecord;
   suggestionItems: Item[];
   onClose: () => void;
-  onImported?: (items: Item[]) => void;
+  onImported?: (imported: Item[], updated?: Item[]) => void;
+  onCollectionUpdated?: (collection: Collection) => void;
 };
 
 export function ImportGoogleDriveModal({
   open,
-  collectionId,
+  collection,
   collectionSlug,
   collectionName,
+  collectionMetadata,
   suggestionItems,
   onClose,
   onImported,
+  onCollectionUpdated,
 }: ImportGoogleDriveModalProps) {
+  const collectionId = collection.id;
   const titleId = useId();
   const [connected, setConnected] = useState<boolean | null>(null);
   const [folderUrl, setFolderUrl] = useState("");
-  const [tagsInput, setTagsInput] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
   const [batchMetadata, setBatchMetadata] = useState<ItemMetadata>(() =>
-    defaultBatchMetadata(collectionName),
+    defaultTrackBatchMetadata(),
   );
   const [userMetadataRecords, setUserMetadataRecords] = useState<
     Record<string, string>[]
@@ -62,6 +75,8 @@ export function ImportGoogleDriveModal({
     ],
     [suggestionItems, userMetadataRecords],
   );
+
+  const tagSuggestions = useTagSuggestions(open, suggestionSourceItems);
 
   useEffect(() => {
     if (!open) return;
@@ -102,8 +117,8 @@ export function ImportGoogleDriveModal({
   useEffect(() => {
     if (!open) {
       setFolderUrl("");
-      setTagsInput("");
-      setBatchMetadata(defaultBatchMetadata(collectionName));
+      setTags([]);
+      setBatchMetadata(defaultTrackBatchMetadata());
       setError(null);
       setProgress(null);
       setLoading(false);
@@ -123,21 +138,41 @@ export function ImportGoogleDriveModal({
     setProgress(null);
 
     try {
+      const album = parseCollectionMetadata(collectionMetadata);
       const result = await syncDriveFolderToCollection({
         collectionId,
         collectionName,
+        company: album.company,
         folderUrl,
-        tags: parseTagsInput(tagsInput),
-        batchMetadata: { ...batchMetadata, collection: collectionName },
+        tags: dedupeTrimmedStrings(tags),
+        batchMetadata,
         onProgress: setProgress,
       });
 
-      if (result.errors.length > 0 && result.imported.length === 0) {
+      const trimmedFolder = folderUrl.trim();
+      if (trimmedFolder) {
+        const supabase = createBrowserClientInstance();
+        const { data: updatedCollection } = await saveCollectionDriveFolderUrl(
+          supabase,
+          collectionId,
+          collection.metadata,
+          trimmedFolder,
+        );
+        if (updatedCollection) {
+          onCollectionUpdated?.(updatedCollection);
+        }
+      }
+
+      if (
+        result.errors.length > 0 &&
+        result.imported.length === 0 &&
+        result.updated.length === 0
+      ) {
         setError(result.errors.join("\n"));
         return;
       }
 
-      onImported?.(result.imported);
+      onImported?.(result.imported, result.updated);
 
       if (result.errors.length > 0) {
         setError(
@@ -235,24 +270,26 @@ export function ImportGoogleDriveModal({
                 />
               </div>
 
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="import-tags" className={formLabelClass}>
-                  Default tags
-                </label>
-                <input
-                  id="import-tags"
-                  value={tagsInput}
-                  onChange={(e) => setTagsInput(e.target.value)}
-                  placeholder="floral, vintage, pastel"
-                  className={formInputMdClass}
-                />
-              </div>
+              <TagInput
+                id="import-tags"
+                label="Default tags"
+                value={tags}
+                onChange={setTags}
+                suggestions={tagSuggestions}
+                disabled={loading}
+                placeholder="Applied to every imported item…"
+              />
+
+              <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900">
+                Kit metadata (company, designer, published) comes from this collection’s album info.
+              </p>
 
               <ItemMetadataFields
                 value={batchMetadata}
                 onChange={setBatchMetadata}
-                collectionName={collectionName}
+                collectionMetadata={collectionMetadata}
                 suggestionItems={suggestionSourceItems}
+                showOverrides={false}
               />
             </div>
           ) : null}

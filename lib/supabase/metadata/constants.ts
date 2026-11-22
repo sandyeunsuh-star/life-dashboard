@@ -18,6 +18,8 @@ export const METADATA_KEYS = {
   designer: "designer",
   type: "type",
   file_name: "file_name",
+  palette: "palette",
+  drive_folder_url: "drive_folder_url",
 } as const;
 
 export const ADD_NEW_OPTION = "__add_new__";

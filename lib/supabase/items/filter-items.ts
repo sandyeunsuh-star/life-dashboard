@@ -1,5 +1,7 @@
+import { resolveEffectiveItemMetadata } from "../metadata/resolve";
+import { parsePublished } from "../metadata/schema";
+import type { CollectionMetadataRecord } from "../types/collection-metadata";
 import type { Item } from "../types/item";
-import { parseItemMetadata, parsePublished } from "../metadata/schema";
 
 export type ItemFilterState = {
   search: string;
@@ -21,6 +23,33 @@ export const emptyItemFilters: ItemFilterState = {
   publishedYear: "",
 };
 
+export function toggleTagInFilters(
+  filters: ItemFilterState,
+  tag: string,
+): ItemFilterState {
+  const trimmed = tag.trim();
+  if (!trimmed) return filters;
+
+  const lower = trimmed.toLowerCase();
+  const exists = filters.tags.some((t) => t.toLowerCase() === lower);
+  const tags = exists
+    ? filters.tags.filter((t) => t.toLowerCase() !== lower)
+    : [...filters.tags, trimmed];
+
+  return { ...filters, tags };
+}
+
+export function removeTagFromFilters(
+  filters: ItemFilterState,
+  tag: string,
+): ItemFilterState {
+  const lower = tag.toLowerCase();
+  return {
+    ...filters,
+    tags: filters.tags.filter((t) => t.toLowerCase() !== lower),
+  };
+}
+
 export function getUniqueTagsFromItems(items: Item[]): string[] {
   const tags = new Set<string>();
   for (const item of items) {
@@ -33,7 +62,10 @@ export function getUniqueTagsFromItems(items: Item[]): string[] {
   return Array.from(tags).sort((a, b) => a.localeCompare(b));
 }
 
-export function getStructuredFilterFacets(items: Item[]) {
+export function getStructuredFilterFacets(
+  items: Item[],
+  collectionMetadata: CollectionMetadataRecord = {},
+) {
   const companies = new Set<string>();
   const types = new Set<string>();
   const designers = new Set<string>();
@@ -41,7 +73,10 @@ export function getStructuredFilterFacets(items: Item[]) {
   const years = new Set<string>();
 
   for (const item of items) {
-    const meta = parseItemMetadata(item.metadata);
+    const meta = resolveEffectiveItemMetadata(
+      item.metadata,
+      collectionMetadata,
+    );
     if (meta.company) companies.add(meta.company);
     if (meta.type) types.add(meta.type);
     if (meta.designer) designers.add(meta.designer);
@@ -67,11 +102,15 @@ export function getStructuredFilterFacets(items: Item[]) {
 export function filterCollectionItems(
   items: Item[],
   filters: ItemFilterState,
+  collectionMetadata: CollectionMetadataRecord = {},
 ): Item[] {
   const search = filters.search.trim().toLowerCase();
 
   return items.filter((item) => {
-    const meta = parseItemMetadata(item.metadata);
+    const meta = resolveEffectiveItemMetadata(
+      item.metadata,
+      collectionMetadata,
+    );
 
     if (search) {
       const titleMatch = item.title.toLowerCase().includes(search);
@@ -117,6 +156,18 @@ export function filterCollectionItems(
 
     return true;
   });
+}
+
+export function countActiveItemFilterFields(filters: ItemFilterState): number {
+  let count = 0;
+  if (filters.search.trim()) count += 1;
+  if (filters.tags.length > 0) count += 1;
+  if (filters.company) count += 1;
+  if (filters.type) count += 1;
+  if (filters.designer) count += 1;
+  if (filters.publishedSeason) count += 1;
+  if (filters.publishedYear) count += 1;
+  return count;
 }
 
 export function hasActiveItemFilters(filters: ItemFilterState): boolean {

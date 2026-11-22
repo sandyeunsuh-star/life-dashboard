@@ -6,6 +6,8 @@ create table if not exists public.collections (
   name text not null,
   description text,
   slug text not null,
+  metadata jsonb not null default '{}',
+  cover_image_url text,
   created_at timestamptz not null default now(),
   constraint collections_user_slug_unique unique (user_id, slug)
 );

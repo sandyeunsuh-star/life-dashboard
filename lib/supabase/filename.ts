@@ -1,3 +1,4 @@
+import { dedupeTrimmedStrings } from "./dedupe-strings";
 import { guessItemTitleFromFileName } from "./metadata/title-from-filename";
 
 /** Derive a human-friendly title from an uploaded file name. */
@@ -6,10 +7,9 @@ export function titleFromFileName(fileName: string): string {
 }
 
 export function parseTagsInput(raw: string): string[] {
-  return raw
-    .split(",")
-    .map((tag) => tag.trim())
-    .filter(Boolean);
+  return dedupeTrimmedStrings(
+    raw.split(",").map((tag) => tag.trim()),
+  );
 }
 
 export function metadataRowsToRecord(

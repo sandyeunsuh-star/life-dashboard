@@ -8,7 +8,121 @@ import {
   getCollectionAssetPublicUrl,
   uploadCollectionAsset,
 } from "../storage/collection-assets";
-import type { CreateItemInput, Item, UpdateItemInput } from "../types/item";
+import { dedupeTrimmedStrings } from "../dedupe-strings";
+import {
+  computeCleanedItemFields,
+  type CleanItemTitleContext,
+} from "../metadata/clean-item-title";
+import { parseItemMetadata, serializeItemMetadata } from "../metadata/schema";
+import type {
+  BulkUpdateItemsInput,
+  CreateItemInput,
+  Item,
+  UpdateItemInput,
+} from "../types/item";
+
+export type DriveFolderSyncItem = Pick<
+  Item,
+  "id" | "title" | "drive_url" | "metadata"
+>;
+
+export async function listItemsForDriveFolderSync(
+  supabase: SupabaseClient,
+  collectionId: string,
+) {
+  const { user, error: authError } = await requireAuthUser(supabase);
+  if (authError || !user) {
+    return { data: null, error: authError };
+  }
+
+  const result = await supabase
+    .from("items")
+    .select("id, title, drive_url, metadata")
+    .eq("user_id", user.id)
+    .eq("collection_id", collectionId)
+    .returns<DriveFolderSyncItem[]>();
+
+  if (result.error) {
+    logSupabaseError("listItemsForDriveFolderSync", result.error);
+  }
+
+  return result;
+}
+
+export async function bulkCleanItemTitles(
+  supabase: SupabaseClient,
+  input: {
+    itemIds: string[];
+    context: CleanItemTitleContext;
+    driveFileNameByItemId?: Record<string, string>;
+  },
+) {
+  const { user, error: authError } = await requireAuthUser(supabase);
+  if (authError || !user) {
+    return { data: null, cleanedCount: 0, error: authError };
+  }
+
+  if (input.itemIds.length === 0) {
+    return { data: [], cleanedCount: 0, error: null };
+  }
+
+  const { data: rows, error: fetchError } = await supabase
+    .from("items")
+    .select(
+      "id, user_id, collection_id, title, thumbnail_url, drive_url, tags, metadata, created_at",
+    )
+    .eq("user_id", user.id)
+    .in("id", input.itemIds)
+    .returns<Item[]>();
+
+  if (fetchError) {
+    logSupabaseError("bulkCleanItemTitles fetch", fetchError);
+    return { data: null, cleanedCount: 0, error: fetchError };
+  }
+
+  const updateResults = await Promise.all(
+    (rows ?? []).map(async (item) => {
+      const driveFileName = input.driveFileNameByItemId?.[item.id];
+      const { title, metadata, changed } = computeCleanedItemFields(
+        item,
+        input.context,
+        driveFileName,
+      );
+
+      if (!changed) {
+        return { item: null as Item | null, error: null as PostgrestError | null };
+      }
+
+      const result = await supabase
+        .from("items")
+        .update({ title, metadata })
+        .eq("id", item.id)
+        .eq("user_id", user.id)
+        .select(
+          "id, user_id, collection_id, title, thumbnail_url, drive_url, tags, metadata, created_at",
+        )
+        .single()
+        .returns<Item>();
+
+      if (result.error) {
+        logSupabaseError("bulkCleanItemTitles update", result.error);
+      }
+
+      return { item: result.data ?? null, error: result.error };
+    }),
+  );
+
+  const firstError = updateResults.find((row) => row.error)?.error ?? null;
+  const updated = updateResults
+    .map((row) => row.item)
+    .filter((item): item is Item => Boolean(item));
+
+  return {
+    data: updated,
+    cleanedCount: updated.length,
+    error: firstError,
+  };
+}
 
 export async function listItemDriveUrlsInCollection(
   supabase: SupabaseClient,
@@ -120,7 +234,7 @@ export async function createCollectionItem(
       title,
       thumbnail_url: thumbnailUrl,
       drive_url: driveUrl,
-      tags: input.tags,
+      tags: dedupeTrimmedStrings(input.tags),
       metadata: input.metadata,
     })
     .select(
@@ -155,12 +269,18 @@ export async function updateCollectionItem(
     return { data: null, error: validationError };
   }
 
+  const driveUrl =
+    input.driveUrl === undefined
+      ? undefined
+      : input.driveUrl?.trim() || null;
+
   const result = await supabase
     .from("items")
     .update({
       title,
-      tags: input.tags,
+      tags: dedupeTrimmedStrings(input.tags),
       metadata: input.metadata,
+      ...(driveUrl !== undefined ? { drive_url: driveUrl } : {}),
     })
     .eq("id", input.itemId)
     .eq("user_id", user.id)
@@ -198,6 +318,116 @@ export async function listUserItemMetadataRecords(supabase: SupabaseClient) {
     .filter(Boolean);
 
   return { data: records, error: null };
+}
+
+export async function bulkUpdateCollectionItems(
+  supabase: SupabaseClient,
+  input: BulkUpdateItemsInput,
+) {
+  const { user, error: authError } = await requireAuthUser(supabase);
+  if (authError || !user) {
+    return { data: null, error: authError };
+  }
+
+  if (input.itemIds.length === 0) {
+    return { data: [], error: null };
+  }
+
+  const { data: rows, error: fetchError } = await supabase
+    .from("items")
+    .select(
+      "id, user_id, collection_id, title, thumbnail_url, drive_url, tags, metadata, created_at",
+    )
+    .eq("user_id", user.id)
+    .in("id", input.itemIds)
+    .returns<Item[]>();
+
+  if (fetchError) {
+    logSupabaseError("bulkUpdateCollectionItems fetch", fetchError);
+    return { data: null, error: fetchError };
+  }
+
+  const updated: Item[] = [];
+
+  for (const item of rows ?? []) {
+    const meta = parseItemMetadata(item.metadata);
+
+    if (input.applyType) {
+      meta.type = input.type?.trim() || undefined;
+    }
+    if (input.applyCompany) {
+      meta.company = input.company?.trim() || undefined;
+    }
+    if (input.applyDesigner) {
+      meta.designer = input.designer?.trim() || undefined;
+    }
+    if (input.applyPublished) {
+      meta.published = input.published?.trim() || undefined;
+    }
+
+    let tags = [...(item.tags ?? [])];
+    if (input.applyTagsReplace) {
+      tags = dedupeTrimmedStrings(input.tagsReplace);
+    }
+    if (input.applyTagsAdd) {
+      tags = dedupeTrimmedStrings([
+        ...tags,
+        ...input.tagsToAdd.map((tag) => tag.trim()),
+      ]);
+    } else if (!input.applyTagsReplace) {
+      tags = dedupeTrimmedStrings(tags);
+    }
+
+    const metadataRecord = serializeItemMetadata(meta);
+
+    const { data: saved, error: updateError } = await supabase
+      .from("items")
+      .update({ tags, metadata: metadataRecord })
+      .eq("id", item.id)
+      .eq("user_id", user.id)
+      .select(
+        "id, user_id, collection_id, title, thumbnail_url, drive_url, tags, metadata, created_at",
+      )
+      .single()
+      .returns<Item>();
+
+    if (updateError) {
+      logSupabaseError("bulkUpdateCollectionItems update", updateError);
+      return { data: null, error: updateError };
+    }
+
+    if (saved) {
+      updated.push(saved);
+    }
+  }
+
+  return { data: updated, error: null };
+}
+
+export async function deleteCollectionItems(
+  supabase: SupabaseClient,
+  itemIds: string[],
+) {
+  const { user, error: authError } = await requireAuthUser(supabase);
+  if (authError || !user) {
+    return { data: null, error: authError };
+  }
+
+  if (itemIds.length === 0) {
+    return { data: true, error: null };
+  }
+
+  const result = await supabase
+    .from("items")
+    .delete()
+    .eq("user_id", user.id)
+    .in("id", itemIds);
+
+  if (result.error) {
+    logSupabaseError("deleteCollectionItems", result.error);
+  }
+
+  return result;
 }
 
 export async function deleteCollectionItem(

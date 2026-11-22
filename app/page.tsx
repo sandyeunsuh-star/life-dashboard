@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { CollectionsDashboard } from "@/app/collections-dashboard";
 import { SignOutButton } from "@/app/sign-out-button";
 import { formatSupabaseError } from "@/lib/supabase/errors";
-import { listCollections } from "@/lib/supabase/queries/collections";
+import { listCollectionsForDashboard } from "@/lib/supabase/queries/collections";
 import { createServerClientInstance } from "@/lib/supabase/server";
 
 export const instant = false;
@@ -13,7 +13,8 @@ async function HomeContent() {
   await connection();
 
   const supabase = await createServerClientInstance();
-  const { data: collections, error } = await listCollections(supabase);
+  const { data: collections, error } =
+    await listCollectionsForDashboard(supabase);
 
   if (error) {
     throw new Error(formatSupabaseError(error));

@@ -1,8 +1,8 @@
 import { METADATA_KEYS, METADATA_SEASONS } from "./constants";
 
+/** Track-level fields; company/designer/published are optional per-item overrides. */
 export type ItemMetadata = {
   company?: string;
-  collection?: string;
   published?: string;
   designer?: string;
   type?: string;
@@ -18,7 +18,6 @@ export function parseItemMetadata(
 
   return {
     company: raw[METADATA_KEYS.company]?.trim() || undefined,
-    collection: raw[METADATA_KEYS.collection]?.trim() || undefined,
     published: raw[METADATA_KEYS.published]?.trim() || undefined,
     designer: raw[METADATA_KEYS.designer]?.trim() || undefined,
     type: raw[METADATA_KEYS.type]?.trim() || undefined,
@@ -45,27 +44,67 @@ export function parsePublished(value: string | undefined): {
     return { season: "", year: "" };
   }
 
-  const match = value.trim().match(/^(\w+)\s+(\d{4})$/);
-  if (!match) {
-    return { season: "", year: "" };
+  const trimmed = value.trim();
+  const match = trimmed.match(/^(\w+)\s+(\d{4})$/i);
+  if (match) {
+    const seasonRaw = match[1]!;
+    const year = match[2]!;
+    const validSeason =
+      METADATA_SEASONS.find(
+        (season) => season.toLowerCase() === seasonRaw.toLowerCase(),
+      ) ?? "";
+    return { season: validSeason, year };
   }
 
-  const season = match[1]!;
-  const year = match[2]!;
-  const validSeason = METADATA_SEASONS.includes(
-    season as (typeof METADATA_SEASONS)[number],
-  )
-    ? season
-    : "";
+  if (/^\d{4}$/.test(trimmed)) {
+    return { season: "", year: trimmed };
+  }
 
-  return { season: validSeason, year };
+  const validSeasonOnly =
+    METADATA_SEASONS.find(
+      (season) => season.toLowerCase() === trimmed.toLowerCase(),
+    ) ?? "";
+  if (validSeasonOnly) {
+    return { season: validSeasonOnly, year: "" };
+  }
+
+  return { season: "", year: "" };
+}
+
+/** Accepts `"Summer 2016"` or `{ season, year }` from JSONB. */
+export function coercePublishedToString(raw: unknown): string | undefined {
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    return trimmed || undefined;
+  }
+
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    const record = raw as { season?: unknown; year?: unknown };
+    const season =
+      typeof record.season === "string" ? record.season.trim() : "";
+    const year =
+      typeof record.year === "string"
+        ? record.year.trim()
+        : typeof record.year === "number" && Number.isFinite(record.year)
+          ? String(record.year)
+          : "";
+    return buildPublished(season, year);
+  }
+
+  return undefined;
 }
 
 export function buildPublished(season: string, year: string): string | undefined {
-  if (!season || !year) {
-    return undefined;
+  if (season && year) {
+    return `${season} ${year}`;
   }
-  return `${season} ${year}`;
+  if (season) {
+    return season;
+  }
+  if (year) {
+    return year;
+  }
+  return undefined;
 }
 
 export function mergeItemMetadata(
@@ -78,23 +117,17 @@ export function mergeItemMetadata(
   };
 }
 
-export function defaultBatchMetadata(
-  collectionName: string,
+export function defaultTrackBatchMetadata(
   partial: Partial<ItemMetadata> = {},
 ): ItemMetadata {
-  return {
-    collection: collectionName,
-    ...partial,
-  };
+  return { ...partial };
 }
 
 export function metadataForNewUpload(
-  collectionName: string,
   fileName: string,
   batchDefaults: ItemMetadata,
 ): ItemMetadata {
   return mergeItemMetadata(batchDefaults, {
-    collection: collectionName,
     file_name: fileName,
   });
 }

@@ -30,9 +30,14 @@ function compactTitleCase(value: string): string {
  * Guess a display title from a Drive / upload file name.
  * Saves exact `file_name` separately in metadata.
  */
+export type GuessItemTitleOptions = {
+  company?: string;
+};
+
 export function guessItemTitleFromFileName(
   fileName: string,
   collectionName: string,
+  options?: GuessItemTitleOptions,
 ): { title: string; file_name: string } {
   const file_name = fileName;
 
@@ -46,6 +51,14 @@ export function guessItemTitleFromFileName(
   if (collection) {
     stem = stem
       .replace(new RegExp(escapeRegex(collection), "gi"), " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  const company = options?.company?.trim();
+  if (company) {
+    stem = stem
+      .replace(new RegExp(escapeRegex(company), "gi"), " ")
       .replace(/\s+/g, " ")
       .trim();
   }
