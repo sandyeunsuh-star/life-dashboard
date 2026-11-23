@@ -2,7 +2,7 @@
 
 import { X } from "lucide-react";
 import Image from "next/image";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { CollectionMetadataFields } from "@/app/collections/[slug]/collection-metadata-fields";
 import { CollectionPaletteEditor } from "@/app/collections/collection-palette-editor";
@@ -28,7 +28,10 @@ import {
   formTextareaClass,
 } from "@/lib/ui/form-styles";
 import { SaveShortcutHint } from "@/lib/ui/save-shortcut-hint";
-import { useSaveKeyboardShortcut } from "@/lib/ui/use-save-keyboard-shortcut";
+import {
+  invokeFormSubmitHandler,
+  useSaveKeyboardShortcut,
+} from "@/lib/ui/use-save-keyboard-shortcut";
 
 type NewCollectionModalProps = {
   open: boolean;
@@ -114,60 +117,65 @@ export function NewCollectionModal({
     })();
   }, [open]);
 
-  useSaveKeyboardShortcut(open, loading || !suggestionsReady, () => {
-    formRef.current?.requestSubmit();
-  });
+  const handleSubmit = useCallback(
+    async (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      setError(null);
+      setLoading(true);
+
+      const supabase = createBrowserClientInstance();
+      const { data, error: createError } = await createCollection(supabase, {
+        name,
+        description: description.trim() || undefined,
+        metadata: collectionMetadataInputToRecord(albumMetadata),
+      });
+
+      setLoading(false);
+
+      if (createError) {
+        setError(formatSupabaseError(createError));
+        return;
+      }
+
+      if (!data) {
+        setError(
+          formatSupabaseError({
+            message: "Collection was not returned after insert.",
+            code: "PGRST116",
+          }),
+        );
+        return;
+      }
+
+      let result = data;
+      if (coverFile) {
+        const { data: withCover, error: coverError } =
+          await uploadCollectionCoverFromFile(supabase, data.id, coverFile);
+        if (coverError) {
+          setError(formatSupabaseError(coverError));
+          onCreated?.(data);
+          onClose();
+          return;
+        }
+        if (withCover) {
+          result = withCover;
+        }
+      }
+
+      onCreated?.(result);
+      onClose();
+    },
+    [albumMetadata, coverFile, description, name, onClose, onCreated],
+  );
+
+  const saveViaShortcut = useCallback(() => {
+    invokeFormSubmitHandler(handleSubmit);
+  }, [handleSubmit]);
+
+  useSaveKeyboardShortcut(open, loading || !suggestionsReady, saveViaShortcut);
 
   if (!open) {
     return null;
-  }
-
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-    setLoading(true);
-
-    const supabase = createBrowserClientInstance();
-    const { data, error: createError } = await createCollection(supabase, {
-      name,
-      description: description.trim() || undefined,
-      metadata: collectionMetadataInputToRecord(albumMetadata),
-    });
-
-    setLoading(false);
-
-    if (createError) {
-      setError(formatSupabaseError(createError));
-      return;
-    }
-
-    if (!data) {
-      setError(
-        formatSupabaseError({
-          message: "Collection was not returned after insert.",
-          code: "PGRST116",
-        }),
-      );
-      return;
-    }
-
-    let result = data;
-    if (coverFile) {
-      const { data: withCover, error: coverError } =
-        await uploadCollectionCoverFromFile(supabase, data.id, coverFile);
-      if (coverError) {
-        setError(formatSupabaseError(coverError));
-        onCreated?.(data);
-        onClose();
-        return;
-      }
-      if (withCover) {
-        result = withCover;
-      }
-    }
-
-    onCreated?.(result);
-    onClose();
   }
 
   return (

@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
+import { SaveShortcutHint } from "@/lib/ui/save-shortcut-hint";
+import { useSaveKeyboardShortcut } from "@/lib/ui/use-save-keyboard-shortcut";
 import type { QuickCopySettings } from "@/lib/weekly/constants";
 
 type QuickCopyEditModalProps = {
@@ -19,10 +21,26 @@ export function QuickCopyEditModal({
 }: QuickCopyEditModalProps) {
   const [draft, setDraft] = useState(quickCopy);
   const [saving, setSaving] = useState(false);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
 
   useEffect(() => {
     if (open) setDraft(quickCopy);
   }, [open, quickCopy]);
+
+  const performSave = useCallback(async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await onSave(draftRef.current);
+    } finally {
+      setSaving(false);
+    }
+  }, [onSave, saving]);
+
+  useSaveKeyboardShortcut(open, saving, () => {
+    void performSave();
+  });
 
   if (!open) return null;
 
@@ -68,7 +86,8 @@ export function QuickCopyEditModal({
             onChange={(v) => setDraft((d) => ({ ...d, customs_id: v }))}
           />
         </div>
-        <div className="flex justify-end gap-2 border-t border-zinc-200 px-5 py-4">
+        <div className="flex items-center justify-end gap-2 border-t border-zinc-200 px-5 py-4">
+          <SaveShortcutHint />
           <button
             type="button"
             onClick={onClose}
@@ -79,14 +98,7 @@ export function QuickCopyEditModal({
           <button
             type="button"
             disabled={saving}
-            onClick={async () => {
-              setSaving(true);
-              try {
-                await onSave(draft);
-              } finally {
-                setSaving(false);
-              }
-            }}
+            onClick={() => void performSave()}
             className="rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
           >
             {saving ? "Saving…" : "Save"}

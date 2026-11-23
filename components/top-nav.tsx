@@ -39,7 +39,7 @@ export function TopNav() {
               Weekly
             </Link>
             <Link href="/designer" className={navLinkClass(designerActive)}>
-              I Am a Designer
+              Creative Room
             </Link>
           </nav>
         </div>

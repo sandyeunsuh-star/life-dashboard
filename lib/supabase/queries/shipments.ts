@@ -6,6 +6,14 @@ import { logSupabaseError } from "../errors";
 import { requireAuthUser } from "../require-auth-user";
 import type { ShipmentRow } from "../types/shipment";
 
+const SHIPMENT_SELECT =
+  "id, user_id, label, status, tracking_number, tracking_url, notes, is_delivered, created_at, updated_at";
+
+function emptyToNull(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
 export async function listShipments(supabase: SupabaseClient) {
   const { user, error: authError } = await requireAuthUser(supabase);
   if (authError || !user) {
@@ -14,9 +22,7 @@ export async function listShipments(supabase: SupabaseClient) {
 
   const { data, error } = await supabase
     .from("shipments")
-    .select(
-      "id, user_id, label, status, tracking_url, is_delivered, created_at, updated_at",
-    )
+    .select(SHIPMENT_SELECT)
     .eq("user_id", user.id)
     .order("is_delivered", { ascending: true })
     .order("created_at", { ascending: false });
@@ -32,7 +38,9 @@ export async function listShipments(supabase: SupabaseClient) {
 export type CreateShipmentInput = {
   label: string;
   status: ShipmentStatus;
+  tracking_number?: string | null;
   tracking_url?: string | null;
+  notes?: string | null;
 };
 
 export async function createShipment(
@@ -52,12 +60,12 @@ export async function createShipment(
       user_id: user.id,
       label: input.label.trim(),
       status: input.status,
-      tracking_url: input.tracking_url?.trim() || null,
+      tracking_number: emptyToNull(input.tracking_number),
+      tracking_url: emptyToNull(input.tracking_url),
+      notes: emptyToNull(input.notes),
       is_delivered: isDelivered,
     })
-    .select(
-      "id, user_id, label, status, tracking_url, is_delivered, created_at, updated_at",
-    )
+    .select(SHIPMENT_SELECT)
     .single();
 
   if (error) {
@@ -71,7 +79,9 @@ export async function createShipment(
 export type UpdateShipmentInput = {
   label?: string;
   status?: ShipmentStatus;
+  tracking_number?: string | null;
   tracking_url?: string | null;
+  notes?: string | null;
   is_delivered?: boolean;
 };
 
@@ -93,8 +103,14 @@ export async function updateShipment(
     patch.status = input.status;
     if (input.status === "Delivered") patch.is_delivered = true;
   }
+  if (input.tracking_number !== undefined) {
+    patch.tracking_number = emptyToNull(input.tracking_number);
+  }
   if (input.tracking_url !== undefined) {
-    patch.tracking_url = input.tracking_url?.trim() || null;
+    patch.tracking_url = emptyToNull(input.tracking_url);
+  }
+  if (input.notes !== undefined) {
+    patch.notes = emptyToNull(input.notes);
   }
   if (input.is_delivered !== undefined) {
     patch.is_delivered = input.is_delivered;
@@ -106,9 +122,7 @@ export async function updateShipment(
     .update(patch)
     .eq("id", id)
     .eq("user_id", user.id)
-    .select(
-      "id, user_id, label, status, tracking_url, is_delivered, created_at, updated_at",
-    )
+    .select(SHIPMENT_SELECT)
     .single();
 
   if (error) {

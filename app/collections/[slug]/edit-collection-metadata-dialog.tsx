@@ -4,7 +4,10 @@ import { X } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { SaveShortcutHint } from "@/lib/ui/save-shortcut-hint";
-import { useSaveKeyboardShortcut } from "@/lib/ui/use-save-keyboard-shortcut";
+import {
+  invokeFormSubmitHandler,
+  useSaveKeyboardShortcut,
+} from "@/lib/ui/use-save-keyboard-shortcut";
 
 import { CollectionMetadataFields } from "@/app/collections/[slug]/collection-metadata-fields";
 import { CollectionPaletteEditor } from "@/app/collections/collection-palette-editor";
@@ -98,42 +101,51 @@ export function EditCollectionMetadataDialog({
     };
   }, [open]);
 
-  useSaveKeyboardShortcut(open, loading || !suggestionsLoaded, () => {
-    formRef.current?.requestSubmit();
-  });
+  const handleSubmit = useCallback(
+    async (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      setError(null);
+      setLoading(true);
+
+      const current = collectionRef.current;
+      const supabase = createBrowserClientInstance();
+      const { data, error: updateError } = await updateCollectionMetadata(
+        supabase,
+        {
+          collectionId: current.id,
+          metadata: collectionMetadataInputToRecord(
+            metadata,
+            current.metadata,
+          ),
+        },
+      );
+
+      setLoading(false);
+
+      if (updateError) {
+        setError(formatSupabaseError(updateError));
+        return;
+      }
+
+      if (!data) {
+        setError("Collection was not returned after update.");
+        return;
+      }
+
+      onSaved(data);
+      onClose();
+    },
+    [metadata, onClose, onSaved],
+  );
+
+  const saveViaShortcut = useCallback(() => {
+    invokeFormSubmitHandler(handleSubmit);
+  }, [handleSubmit]);
+
+  useSaveKeyboardShortcut(open, loading || !suggestionsLoaded, saveViaShortcut);
 
   if (!open) {
     return null;
-  }
-
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-    setLoading(true);
-
-    const supabase = createBrowserClientInstance();
-    const { data, error: updateError } = await updateCollectionMetadata(
-      supabase,
-      {
-        collectionId: collection.id,
-        metadata: collectionMetadataInputToRecord(metadata, collection.metadata),
-      },
-    );
-
-    setLoading(false);
-
-    if (updateError) {
-      setError(formatSupabaseError(updateError));
-      return;
-    }
-
-    if (!data) {
-      setError("Collection was not returned after update.");
-      return;
-    }
-
-    onSaved(data);
-    onClose();
   }
 
   return (

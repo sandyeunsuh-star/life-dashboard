@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
 
 import { createBrowserClientInstance } from "@/lib/supabase/client";
@@ -29,7 +29,10 @@ import { TagInput } from "@/lib/ui/tag-input";
 import { useTagSuggestions } from "@/lib/ui/use-tag-suggestions";
 import { formInputMdClass } from "@/lib/ui/form-styles";
 import { SaveShortcutHint } from "@/lib/ui/save-shortcut-hint";
-import { useSaveKeyboardShortcut } from "@/lib/ui/use-save-keyboard-shortcut";
+import {
+  invokeFormSubmitHandler,
+  useSaveKeyboardShortcut,
+} from "@/lib/ui/use-save-keyboard-shortcut";
 
 function FieldApplyToggle({
   id,
@@ -168,65 +171,89 @@ export function BulkEditItemsModal({
     })();
   }, [open]);
 
-  useSaveKeyboardShortcut(open, loading, () => {
-    formRef.current?.requestSubmit();
-  });
+  const handleSubmit = useCallback(
+    async (event: React.FormEvent) => {
+      event.preventDefault();
+
+      if (
+        !applyType &&
+        !applyTagsAdd &&
+        !applyTagsReplace &&
+        !applyCompany &&
+        !applyDesigner &&
+        !applyPublished
+      ) {
+        setError("Turn on at least one field to apply.");
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      const published = applyPublished
+        ? buildPublished(publishedSeason, publishedYear)
+        : undefined;
+
+      const supabase = createBrowserClientInstance();
+      const { data, error: bulkError } = await bulkUpdateCollectionItems(
+        supabase,
+        {
+          itemIds: selectedIds,
+          applyType,
+          type: typeValue || newType,
+          applyTagsAdd,
+          tagsToAdd: dedupeTrimmedStrings(tagsToAdd),
+          applyTagsReplace,
+          tagsReplace: dedupeTrimmedStrings(tagsToReplace),
+          applyCompany,
+          company: companyValue || newCompany,
+          applyDesigner,
+          designer: designerValue,
+          applyPublished,
+          published,
+        },
+      );
+
+      setLoading(false);
+
+      if (bulkError) {
+        setError(formatSupabaseError(bulkError));
+        return;
+      }
+
+      onSaved(data ?? []);
+      onClose();
+    },
+    [
+      applyCompany,
+      applyDesigner,
+      applyPublished,
+      applyTagsAdd,
+      applyTagsReplace,
+      applyType,
+      companyValue,
+      designerValue,
+      newCompany,
+      newType,
+      onClose,
+      onSaved,
+      publishedSeason,
+      publishedYear,
+      selectedIds,
+      tagsToAdd,
+      tagsToReplace,
+      typeValue,
+    ],
+  );
+
+  const saveViaShortcut = useCallback(() => {
+    invokeFormSubmitHandler(handleSubmit);
+  }, [handleSubmit]);
+
+  useSaveKeyboardShortcut(open, loading, saveViaShortcut);
 
   if (!open) {
     return null;
-  }
-
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
-
-    if (
-      !applyType &&
-      !applyTagsAdd &&
-      !applyTagsReplace &&
-      !applyCompany &&
-      !applyDesigner &&
-      !applyPublished
-    ) {
-      setError("Turn on at least one field to apply.");
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    const published = applyPublished
-      ? buildPublished(publishedSeason, publishedYear)
-      : undefined;
-
-    const supabase = createBrowserClientInstance();
-    const { data, error: bulkError } = await bulkUpdateCollectionItems(
-      supabase,
-      {
-        itemIds: selectedIds,
-        applyType,
-        type: typeValue || newType,
-        applyTagsAdd,
-        tagsToAdd: dedupeTrimmedStrings(tagsToAdd),
-        applyTagsReplace,
-        tagsReplace: dedupeTrimmedStrings(tagsToReplace),
-        applyCompany,
-        company: companyValue || newCompany,
-        applyDesigner,
-        designer: designerValue,
-        applyPublished,
-        published,
-      },
-    );
-
-    setLoading(false);
-
-    if (bulkError) {
-      setError(formatSupabaseError(bulkError));
-      return;
-    }
-
-    onSaved(data ?? []);
-    onClose();
   }
 
   return (

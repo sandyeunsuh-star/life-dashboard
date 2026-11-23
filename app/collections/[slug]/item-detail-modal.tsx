@@ -2,10 +2,13 @@
 
 import { Copy, Download, ExternalLink, Trash2, X } from "lucide-react";
 import Image from "next/image";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { SaveShortcutHint } from "@/lib/ui/save-shortcut-hint";
-import { useSaveKeyboardShortcut } from "@/lib/ui/use-save-keyboard-shortcut";
+import {
+  invokeFormSubmitHandler,
+  useSaveKeyboardShortcut,
+} from "@/lib/ui/use-save-keyboard-shortcut";
 
 import { ItemMetadataFields } from "@/app/collections/[slug]/item-metadata-fields";
 import { createBrowserClientInstance } from "@/lib/supabase/client";
@@ -133,9 +136,49 @@ export function ItemDetailModal({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open, loading, onClose]);
 
-  useSaveKeyboardShortcut(open, loading, () => {
-    formRef.current?.requestSubmit();
-  });
+  const handleSave = useCallback(
+    async (event: React.FormEvent) => {
+      event.preventDefault();
+      if (!item) return;
+
+      setError(null);
+      setLoading(true);
+
+      const supabase = createBrowserClientInstance();
+      const { data, error: updateError } = await updateCollectionItem(
+        supabase,
+        {
+          itemId: item.id,
+          title,
+          tags: dedupeTrimmedStrings(tags),
+          metadata: serializeItemMetadata(metadata),
+          driveUrl: driveUrl.trim() || null,
+        },
+      );
+
+      setLoading(false);
+
+      if (updateError) {
+        setError(formatSupabaseError(updateError));
+        return;
+      }
+
+      if (!data) {
+        setError("Item was not returned after update.");
+        return;
+      }
+
+      onUpdated(data);
+      onClose();
+    },
+    [driveUrl, item, metadata, onClose, onUpdated, tags, title],
+  );
+
+  const saveViaShortcut = useCallback(() => {
+    invokeFormSubmitHandler(handleSave);
+  }, [handleSave]);
+
+  useSaveKeyboardShortcut(open, loading, saveViaShortcut);
 
   if (!open || !item) {
     return null;
@@ -153,36 +196,6 @@ export function ItemDetailModal({
     } catch {
       setError("Could not copy link.");
     }
-  }
-
-  async function handleSave(event: React.FormEvent) {
-    event.preventDefault();
-    setError(null);
-    setLoading(true);
-
-    const supabase = createBrowserClientInstance();
-    const { data, error: updateError } = await updateCollectionItem(supabase, {
-      itemId: activeItem.id,
-      title,
-      tags: dedupeTrimmedStrings(tags),
-      metadata: serializeItemMetadata(metadata),
-      driveUrl: driveUrl.trim() || null,
-    });
-
-    setLoading(false);
-
-    if (updateError) {
-      setError(formatSupabaseError(updateError));
-      return;
-    }
-
-    if (!data) {
-      setError("Item was not returned after update.");
-      return;
-    }
-
-    onUpdated(data);
-    onClose();
   }
 
   async function handleSetAsCollectionCover() {

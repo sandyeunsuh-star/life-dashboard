@@ -24,7 +24,7 @@ export function SaveShortcutHint() {
 
   return (
     <span className="ml-1.5 text-[10px] font-normal text-white/55" aria-hidden>
-      {mod}S
+      {mod}S · {mod}↵
     </span>
   );
 }

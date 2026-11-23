@@ -73,7 +73,9 @@ create table if not exists public.shipments (
   label text not null,
   status text not null default 'Ordered'
     check (status in ('Ordered', 'Shipped', 'Customs', 'Delivered')),
+  tracking_number text,
   tracking_url text,
+  notes text,
   is_delivered boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

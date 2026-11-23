@@ -178,12 +178,8 @@ export function WeeklyDashboard({
 
       <ShipmentsCard
         shipments={shipments}
-        onCreate={async (label, status, trackingUrl) => {
-          const { data, error } = await createShipment(supabase, {
-            label,
-            status,
-            tracking_url: trackingUrl,
-          });
+        onCreate={async (payload) => {
+          const { data, error } = await createShipment(supabase, payload);
           if (error) throw error;
           if (data) setShipments((s) => [data, ...s]);
         }}
@@ -191,7 +187,9 @@ export function WeeklyDashboard({
           const { data, error } = await updateShipment(supabase, id, {
             label: patch.label,
             status: patch.status as ShipmentStatus | undefined,
+            tracking_number: patch.tracking_number,
             tracking_url: patch.tracking_url,
+            notes: patch.notes,
             is_delivered: patch.is_delivered,
           });
           if (error) throw error;
