@@ -2,6 +2,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 
 import { CollectionsDashboard } from "@/app/collections-dashboard";
+import { CreativeRoomSectionNav } from "@/components/creative-room-section-nav";
 import { formatSupabaseError } from "@/lib/supabase/errors";
 import { listCollectionsForDashboard } from "@/lib/supabase/queries/collections";
 import { createServerClientInstance } from "@/lib/supabase/server";
@@ -21,6 +22,7 @@ async function DesignerContent() {
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-10">
+      <CreativeRoomSectionNav active="collections" />
       <CollectionsDashboard collections={collections ?? []} />
     </main>
   );
