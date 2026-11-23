@@ -10,8 +10,13 @@ export const CREATIVE_ROOM_SECTIONS = [
   },
   {
     id: "knitting",
-    label: "Knitting Corner",
+    label: "Knitting Nook",
     href: "/designer/knitting",
+  },
+  {
+    id: "sewing",
+    label: "Sewing Corner",
+    href: "/designer/sewing",
   },
 ] as const;
 

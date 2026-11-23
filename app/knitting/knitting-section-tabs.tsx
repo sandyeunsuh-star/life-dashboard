@@ -18,7 +18,7 @@ export function KnittingSectionTabs({
   return (
     <div
       role="tablist"
-      aria-label="Knitting library or wishlist"
+      aria-label="Knitting Nook library or wishlist"
       className="inline-flex rounded-lg border border-zinc-200 bg-zinc-50 p-1"
     >
       <TabButton

@@ -10,6 +10,7 @@ import {
   YARN_WEIGHTS,
   type KnittingStatus,
 } from "@/lib/knitting/constants";
+import { NeedleSizePicker } from "@/app/knitting/needle-size-picker";
 import { createBrowserClientInstance } from "@/lib/supabase/client";
 import { formatSupabaseError } from "@/lib/supabase/errors";
 import { compressToWebpCover } from "@/lib/supabase/images/compress-cover";
@@ -544,17 +545,14 @@ export function KnittingPatternModal({
                   ))}
                 </select>
               </label>
-              <label className="flex flex-col gap-1.5">
-                <span className={formLabelClass}>Needle size</span>
-                <input
+              <div className="sm:col-span-2">
+                <NeedleSizePicker
                   value={form.needle_size}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, needle_size: e.target.value }))
+                  onChange={(needle_size) =>
+                    setForm((f) => ({ ...f, needle_size }))
                   }
-                  className={formInputMdClass}
-                  placeholder="4.0mm / US 6"
                 />
-              </label>
+              </div>
               <label className="flex flex-col gap-1.5">
                 <span className={formLabelClass}>Gauge</span>
                 <input

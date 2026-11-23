@@ -10,6 +10,7 @@ export type KnittingStatus = (typeof KNITTING_STATUSES)[number];
 export const KNITTING_CATEGORIES = [
   "Sweater",
   "Cardigan",
+  "Dress",
   "Top / Tee",
   "Shawl / Wrap",
   "Socks",
