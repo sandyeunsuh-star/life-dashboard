@@ -19,7 +19,9 @@ export function TopNav() {
 
   const weeklyActive = pathname === "/";
   const designerActive =
-    pathname === "/designer" || pathname.startsWith("/collections/");
+    pathname === "/designer" ||
+    pathname.startsWith("/designer/") ||
+    pathname.startsWith("/collections/");
 
   return (
     <header className="sticky top-0 z-40 border-b border-zinc-200/80 bg-white/95 backdrop-blur-sm">

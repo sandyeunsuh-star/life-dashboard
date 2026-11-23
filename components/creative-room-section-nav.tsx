@@ -8,7 +8,11 @@ export const CREATIVE_ROOM_SECTIONS = [
     label: "Collections",
     href: "/designer",
   },
-  // Plug in Pattern Library (or other tools) here when ready.
+  {
+    id: "knitting",
+    label: "Knitting Corner",
+    href: "/designer/knitting",
+  },
 ] as const;
 
 export type CreativeRoomSectionId =
