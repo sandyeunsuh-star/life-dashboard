@@ -15,6 +15,7 @@ import {
 import { EditCollectionMetadataDialog } from "@/app/collections/[slug]/edit-collection-metadata-dialog";
 import { CollectionMetadataBadges } from "@/app/collections/[slug]/collection-metadata-badges";
 import { CollectionCoverArt } from "@/app/collections/collection-cover-art";
+import { ItemThumbnailFrame } from "@/app/collections/item-thumbnail-frame";
 import { CollectionQuickActions } from "@/app/collections/collection-quick-actions";
 import { CollectionPaletteMiniBar } from "@/app/collections/collection-palette-mini-bar";
 import { NewCollectionModal } from "@/app/new-collection-modal";
@@ -255,8 +256,8 @@ function CollectionsListTable({
                 className="flex min-w-0 flex-1 items-center gap-3 md:grid md:grid-cols-[56px_minmax(0,1.4fr)_minmax(0,0.7fr)_minmax(0,0.7fr)_minmax(0,0.8fr)] md:gap-3"
               >
                 <div className="flex flex-col gap-1">
-                  <div className="relative size-12 shrink-0 overflow-hidden rounded-md bg-zinc-100">
-                    {collection.cover_image_url ? (
+                  {collection.cover_image_url ? (
+                    <div className="relative size-12 shrink-0 overflow-hidden rounded-md bg-zinc-100">
                       <Image
                         src={collection.cover_image_url}
                         alt=""
@@ -264,18 +265,17 @@ function CollectionsListTable({
                         className="object-cover"
                         sizes="48px"
                       />
-                    ) : collection.preview_thumbnails[0] ? (
-                      <Image
-                        src={collection.preview_thumbnails[0]}
-                        alt=""
-                        fill
-                        className="object-cover"
-                        sizes="48px"
-                      />
-                    ) : (
-                      <div className="h-full w-full bg-zinc-100" />
-                    )}
-                  </div>
+                    </div>
+                  ) : collection.preview_thumbnails[0] ? (
+                    <ItemThumbnailFrame
+                      src={collection.preview_thumbnails[0]}
+                      alt=""
+                      sizes="48px"
+                      variant="inline"
+                    />
+                  ) : (
+                    <div className="size-12 shrink-0 rounded-md bg-zinc-50" />
+                  )}
                   <CollectionPaletteMiniBar
                     metadata={collection.metadata}
                     className="w-12"

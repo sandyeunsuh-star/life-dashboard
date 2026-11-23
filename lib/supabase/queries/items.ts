@@ -168,7 +168,9 @@ export async function listItemsByCollection(
     )
     .eq("user_id", user.id)
     .eq("collection_id", collectionId)
-    .order("created_at", { ascending: false })
+    .order("created_at", { ascending: true })
+    .order("title", { ascending: true })
+    .order("id", { ascending: true })
     .returns<Item[]>();
 
   if (result.error) {

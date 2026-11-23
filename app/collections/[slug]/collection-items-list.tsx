@@ -1,8 +1,8 @@
 "use client";
 
 import { Check, ExternalLink } from "lucide-react";
-import Image from "next/image";
-
+import { ItemThumbnailFrame } from "@/app/collections/item-thumbnail-frame";
+import { itemThumbnailFitFromMetadata } from "@/lib/supabase/items/item-thumbnail-fit";
 import {
   getItemFileName,
   itemFileNameDiffersFromTitle,
@@ -94,15 +94,13 @@ export function CollectionItemsList({
                   ) : null}
                 </button>
 
-                <div className="relative size-12 shrink-0 overflow-hidden rounded-md bg-zinc-100">
-                  <Image
-                    src={item.thumbnail_url}
-                    alt=""
-                    fill
-                    className="object-cover"
-                    sizes="48px"
-                  />
-                </div>
+                <ItemThumbnailFrame
+                  src={item.thumbnail_url}
+                  alt={item.title}
+                  sizes="48px"
+                  variant="inline"
+                  fit={itemThumbnailFitFromMetadata(item.metadata)}
+                />
 
                 <div className="min-w-0 lg:contents">
                   <div className="min-w-0">

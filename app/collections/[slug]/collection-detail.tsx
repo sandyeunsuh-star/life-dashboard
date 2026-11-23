@@ -1,7 +1,6 @@
 "use client";
 
 import { Check, CloudDownload, Info, Pencil, Plus } from "lucide-react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useRef, useState } from "react";
 
@@ -16,6 +15,8 @@ import { EditCollectionDialog } from "@/app/collections/[slug]/edit-collection-d
 import { EditCollectionMetadataDialog } from "@/app/collections/[slug]/edit-collection-metadata-dialog";
 import { ImportGoogleDriveModal } from "@/app/collections/[slug]/import-google-drive-modal";
 import { ItemDetailModal } from "@/app/collections/[slug]/item-detail-modal";
+import { ItemThumbnailFrame } from "@/app/collections/item-thumbnail-frame";
+import { itemThumbnailFitFromMetadata } from "@/lib/supabase/items/item-thumbnail-fit";
 import { CollectionItemsList } from "@/app/collections/[slug]/collection-items-list";
 import { CollectionCoverArt } from "@/app/collections/collection-cover-art";
 import { ChangeCollectionCoverButton } from "@/app/collections/change-collection-cover-button";
@@ -26,6 +27,7 @@ import {
   filterCollectionItems,
   toggleTagInFilters,
 } from "@/lib/supabase/items/filter-items";
+import { sortCollectionItems } from "@/lib/supabase/items/sort-items";
 import {
   bulkCleanItemTitles,
   deleteCollectionItems,
@@ -38,6 +40,7 @@ import {
   itemGridDensityClasses,
   useItemGridDensityPreference,
 } from "@/lib/ui/item-grid-density";
+import { useItemSortPreference } from "@/lib/ui/item-sort-preference";
 import {
   useViewLayoutPreference,
   VIEW_LAYOUT_STORAGE,
@@ -89,17 +92,22 @@ export function CollectionDetail({
     VIEW_LAYOUT_STORAGE.items,
   );
   const [itemGridDensity, setItemGridDensity] = useItemGridDensityPreference();
+  const [itemSort, setItemSort] = useItemSortPreference();
   const gridClasses = itemGridDensityClasses(itemGridDensity);
 
-  const previewThumbnails = useMemo(
-    () => items.slice(0, 4).map((item) => item.thumbnail_url),
+  const previewItems = useMemo(
+    () =>
+      items.slice(0, 4).map((item) => ({
+        thumbnail_url: item.thumbnail_url,
+        metadata: item.metadata,
+      })),
     [items],
   );
 
-  const filteredItems = useMemo(
-    () => filterCollectionItems(items, filters, albumMetadata),
-    [items, filters, albumMetadata],
-  );
+  const filteredItems = useMemo(() => {
+    const filtered = filterCollectionItems(items, filters, albumMetadata);
+    return sortCollectionItems(filtered, itemSort);
+  }, [items, filters, albumMetadata, itemSort]);
 
   const allFilteredSelected =
     filteredItems.length > 0 &&
@@ -224,7 +232,7 @@ export function CollectionDetail({
               <div className="absolute inset-0">
                 <CollectionCoverArt
                   coverImageUrl={collection.cover_image_url}
-                  previewThumbnails={previewThumbnails}
+                  previewItems={previewItems}
                   alt={`${collection.name} cover`}
                   aspectClass="h-full w-full"
                   className="h-full w-full"
@@ -332,6 +340,8 @@ export function CollectionDetail({
           onViewLayoutChange={setItemViewLayout}
           gridDensity={itemGridDensity}
           onGridDensityChange={setItemGridDensity}
+          sort={itemSort}
+          onSortChange={setItemSort}
           onChange={setFilters}
           onClear={() => setFilters(emptyItemFilters)}
         />
@@ -415,13 +425,12 @@ export function CollectionDetail({
                         : "border-zinc-200/80 hover:border-zinc-300"
                     }`}
                   >
-                    <div className="relative aspect-square bg-zinc-100">
-                      <Image
+                    <div className="relative">
+                      <ItemThumbnailFrame
                         src={item.thumbnail_url}
                         alt={item.title}
-                        fill
-                        className="object-cover"
                         sizes={gridClasses.imageSizes}
+                        fit={itemThumbnailFitFromMetadata(item.metadata)}
                       />
                       <div
                         className={`absolute left-2 top-2 z-20 transition ${

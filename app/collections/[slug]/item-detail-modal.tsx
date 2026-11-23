@@ -15,6 +15,7 @@ import { createBrowserClientInstance } from "@/lib/supabase/client";
 import { dedupeTrimmedStrings } from "@/lib/supabase/dedupe-strings";
 import { formatSupabaseError } from "@/lib/supabase/errors";
 import { getItemFileName } from "@/lib/supabase/items/item-labels";
+import { itemThumbnailFitFromMetadata } from "@/lib/supabase/items/item-thumbnail-fit";
 import {
   parseItemMetadata,
   serializeItemMetadata,
@@ -185,6 +186,10 @@ export function ItemDetailModal({
   }
 
   const activeItem = item;
+  const thumbnailFit = activeItem
+    ? itemThumbnailFitFromMetadata(activeItem.metadata)
+    : "fitted";
+  const thumbnailIsPaper = thumbnailFit === "paper";
 
   async function copyDriveLink() {
     const value = driveUrl.trim();
@@ -282,15 +287,34 @@ export function ItemDetailModal({
           className="flex min-h-0 flex-1 flex-col overflow-hidden"
         >
           <div className="flex-1 overflow-y-auto overscroll-contain">
-            <div className="relative aspect-[4/3] w-full bg-zinc-100">
-              <Image
-                src={activeItem.thumbnail_url}
-                alt={activeItem.title}
-                fill
-                className="object-contain"
-                sizes="(max-width: 768px) 100vw, 672px"
-                priority
-              />
+            <div
+              className={`relative aspect-[4/3] w-full ${
+                thumbnailIsPaper ? "bg-zinc-100" : "bg-zinc-50"
+              }`}
+            >
+              {thumbnailIsPaper ? (
+                <Image
+                  src={activeItem.thumbnail_url}
+                  alt={activeItem.title}
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 100vw, 672px"
+                  priority
+                />
+              ) : (
+                <div className="absolute inset-0 p-3.5">
+                  <div className="relative h-full w-full">
+                    <Image
+                      src={activeItem.thumbnail_url}
+                      alt={activeItem.title}
+                      fill
+                      className="object-contain"
+                      sizes="(max-width: 768px) 100vw, 672px"
+                      priority
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex flex-col gap-5 px-6 py-4">

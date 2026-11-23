@@ -15,6 +15,10 @@ import {
 import { TagPill } from "@/lib/ui/tag-pill";
 import { METADATA_SEASONS, METADATA_YEARS } from "@/lib/supabase/metadata/constants";
 import type { Item } from "@/lib/supabase/types/item";
+import {
+  ITEM_SORT_OPTIONS,
+  type ItemSortMode,
+} from "@/lib/supabase/items/sort-items";
 import type { ItemGridDensity } from "@/lib/ui/item-grid-density";
 import { ItemGridDensityToggle } from "@/lib/ui/item-grid-density-toggle";
 import type { ViewLayout } from "@/lib/ui/view-layout";
@@ -30,6 +34,8 @@ type CollectionFilterBarProps = {
   onViewLayoutChange: (next: ViewLayout) => void;
   gridDensity: ItemGridDensity;
   onGridDensityChange: (next: ItemGridDensity) => void;
+  sort: ItemSortMode;
+  onSortChange: (next: ItemSortMode) => void;
   onChange: (next: ItemFilterState) => void;
   onClear: () => void;
 };
@@ -43,6 +49,8 @@ export function CollectionFilterBar({
   onViewLayoutChange,
   gridDensity,
   onGridDensityChange,
+  sort,
+  onSortChange,
   onChange,
   onClear,
 }: CollectionFilterBarProps) {
@@ -118,6 +126,25 @@ export function CollectionFilterBar({
             </span>
           ) : null}
         </button>
+
+        <div className="flex flex-col gap-0.5">
+          <label htmlFor="item-sort" className="sr-only">
+            Sort items
+          </label>
+          <select
+            id="item-sort"
+            value={sort}
+            onChange={(e) => onSortChange(e.target.value as ItemSortMode)}
+            className={`${formInputMdClass} h-10 w-[9.5rem] shrink-0 py-0`}
+            aria-label="Sort items"
+          >
+            {ITEM_SORT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
 
         <ViewLayoutToggle
           value={viewLayout}
