@@ -21,9 +21,14 @@ import {
   updateKnittingPattern,
 } from "@/lib/supabase/queries/knitting-patterns";
 import {
+  knittingCoverStoragePath,
+  removePatternCover,
+  resolveKnittingCoverUrl,
+  uploadPatternCover,
+} from "@/lib/supabase/storage/pattern-covers";
+import {
   createKnittingSignedUrl,
   knittingPdfPath,
-  knittingThumbnailPath,
   removeKnittingObject,
   uploadKnittingObject,
 } from "@/lib/supabase/storage/knitting-patterns";
@@ -145,8 +150,8 @@ export function KnittingPatternModal({
       setPendingPdf(null);
       if (pattern.cover_path) {
         const supabase = createBrowserClientInstance();
-        void createKnittingSignedUrl(supabase, pattern.cover_path).then(
-          ({ url }) => setCoverPreview(url),
+        void resolveKnittingCoverUrl(supabase, pattern.cover_path).then((url) =>
+          setCoverPreview(url),
         );
       } else {
         setCoverPreview(null);
@@ -195,18 +200,13 @@ export function KnittingPatternModal({
       try {
         if (pendingCover) {
           const fileId = crypto.randomUUID();
-          const path = knittingThumbnailPath(user.id, fileId);
+          const path = knittingCoverStoragePath(user.id, fileId);
           const compressed = await compressToWebpCover(pendingCover);
-          const up = await uploadKnittingObject(
-            supabase,
-            path,
-            compressed,
-            "image/webp",
-          );
+          const up = await uploadPatternCover(supabase, path, compressed);
           if (up.error) throw up.error;
           cover_path = path;
         } else if (removeCover && oldCover) {
-          await removeKnittingObject(supabase, oldCover);
+          await removePatternCover(supabase, oldCover);
         }
 
         if (pendingPdf) {
@@ -230,7 +230,7 @@ export function KnittingPatternModal({
           oldCover &&
           oldCover !== cover_path
         ) {
-          await removeKnittingObject(supabase, oldCover);
+          await removePatternCover(supabase, oldCover);
         }
         if (pendingPdf && oldPdf && oldPdf !== pdf_path) {
           await removeKnittingObject(supabase, oldPdf);
@@ -338,7 +338,7 @@ export function KnittingPatternModal({
 
     try {
       if (pattern.cover_path) {
-        await removeKnittingObject(supabase, pattern.cover_path);
+        await removePatternCover(supabase, pattern.cover_path);
       }
       if (pattern.pdf_path) {
         await removeKnittingObject(supabase, pattern.pdf_path);
@@ -589,7 +589,8 @@ export function KnittingPatternModal({
                       alt=""
                       fill
                       className="object-cover"
-                      unoptimized
+                      loading="lazy"
+                      decoding="async"
                     />
                   </div>
                 ) : null

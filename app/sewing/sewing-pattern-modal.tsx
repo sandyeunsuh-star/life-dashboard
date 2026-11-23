@@ -20,9 +20,14 @@ import {
   updateSewingPattern,
 } from "@/lib/supabase/queries/sewing-patterns";
 import {
+  removePatternCover,
+  resolveSewingCoverUrl,
+  sewingCoverStoragePath,
+  uploadPatternCover,
+} from "@/lib/supabase/storage/pattern-covers";
+import {
   createSewingSignedUrl,
   removeSewingObject,
-  sewingCoverPath,
   sewingInstructionsPdfPath,
   sewingPatternPdfPath,
   uploadSewingObject,
@@ -162,8 +167,8 @@ export function SewingPatternModal({
       setPendingPatternPdf(null);
       if (pattern.cover_path) {
         const supabase = createBrowserClientInstance();
-        void createSewingSignedUrl(supabase, pattern.cover_path).then(
-          ({ url }) => setCoverPreview(url),
+        void resolveSewingCoverUrl(supabase, pattern.cover_path).then((url) =>
+          setCoverPreview(url),
         );
       } else setCoverPreview(null);
     } else {
@@ -216,18 +221,13 @@ export function SewingPatternModal({
       try {
         if (pendingCover) {
           const fileId = crypto.randomUUID();
-          const path = sewingCoverPath(user.id, fileId);
+          const path = sewingCoverStoragePath(user.id, fileId);
           const compressed = await compressToWebpCover(pendingCover);
-          const up = await uploadSewingObject(
-            supabase,
-            path,
-            compressed,
-            "image/webp",
-          );
+          const up = await uploadPatternCover(supabase, path, compressed);
           if (up.error) throw up.error;
           cover_path = path;
         } else if (removeCover && oldCover) {
-          await removeSewingObject(supabase, oldCover);
+          await removePatternCover(supabase, oldCover);
         }
 
         if (pendingInstructionsPdf) {
@@ -262,7 +262,7 @@ export function SewingPatternModal({
         }
 
         if (pendingCover && oldCover && oldCover !== cover_path) {
-          await removeSewingObject(supabase, oldCover);
+          await removePatternCover(supabase, oldCover);
         }
         if (
           pendingInstructionsPdf &&
@@ -375,7 +375,7 @@ export function SewingPatternModal({
     const supabase = createBrowserClientInstance();
     try {
       if (pattern.cover_path) {
-        await removeSewingObject(supabase, pattern.cover_path);
+        await removePatternCover(supabase, pattern.cover_path);
       }
       if (pattern.instructions_pdf_path) {
         await removeSewingObject(supabase, pattern.instructions_pdf_path);
@@ -760,7 +760,14 @@ function CoverUpload({
       />
       {preview && !removeCover ? (
         <div className="relative mx-auto aspect-video w-full max-w-xs overflow-hidden rounded-lg bg-zinc-100">
-          <Image src={preview} alt="" fill className="object-cover" unoptimized />
+          <Image
+            src={preview}
+            alt=""
+            fill
+            className="object-cover"
+            loading="lazy"
+            decoding="async"
+          />
         </div>
       ) : null}
       {preview && !removeCover ? (

@@ -8,6 +8,7 @@ import { STATUS_PILL_STYLES, type KnittingStatus } from "@/lib/knitting/constant
 import { createBrowserClientInstance } from "@/lib/supabase/client";
 import { formatSupabaseError } from "@/lib/supabase/errors";
 import { moveKnittingPatternToLibrary } from "@/lib/supabase/queries/knitting-patterns";
+import { resolveKnittingCoverUrl } from "@/lib/supabase/storage/pattern-covers";
 import { createKnittingSignedUrl } from "@/lib/supabase/storage/knitting-patterns";
 import type { KnittingPatternRow } from "@/lib/supabase/types/knitting-pattern";
 
@@ -38,11 +39,9 @@ export function KnittingPatternCard({
     }
     let cancelled = false;
     const supabase = createBrowserClientInstance();
-    void createKnittingSignedUrl(supabase, pattern.cover_path).then(
-      ({ url }) => {
-        if (!cancelled) setCoverUrl(url);
-      },
-    );
+    void resolveKnittingCoverUrl(supabase, pattern.cover_path).then((url) => {
+      if (!cancelled) setCoverUrl(url);
+    });
     return () => {
       cancelled = true;
     };

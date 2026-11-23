@@ -8,6 +8,7 @@ import { STATUS_PILL_STYLES, type SewingStatus } from "@/lib/sewing/constants";
 import { createBrowserClientInstance } from "@/lib/supabase/client";
 import { formatSupabaseError } from "@/lib/supabase/errors";
 import { moveSewingPatternToLibrary } from "@/lib/supabase/queries/sewing-patterns";
+import { resolveSewingCoverUrl } from "@/lib/supabase/storage/pattern-covers";
 import { createSewingSignedUrl } from "@/lib/supabase/storage/sewing-patterns";
 import type { SewingPatternRow } from "@/lib/supabase/types/sewing-pattern";
 
@@ -40,7 +41,7 @@ export function SewingPatternCard({
     }
     let cancelled = false;
     const supabase = createBrowserClientInstance();
-    void createSewingSignedUrl(supabase, pattern.cover_path).then(({ url }) => {
+    void resolveSewingCoverUrl(supabase, pattern.cover_path).then((url) => {
       if (!cancelled) setCoverUrl(url);
     });
     return () => {
