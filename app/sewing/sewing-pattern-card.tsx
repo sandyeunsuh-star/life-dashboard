@@ -134,7 +134,8 @@ export function SewingPatternCard({
             fill
             className="object-cover"
             sizes="(max-width: 768px) 50vw, 20vw"
-            unoptimized
+            loading="lazy"
+            decoding="async"
           />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-zinc-400">

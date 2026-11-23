@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { logSupabaseError } from "../errors";
+import { SUPABASE_STORAGE_CACHE_CONTROL } from "./cache-control";
 
 export const KNITTING_PATTERNS_BUCKET = "knitting-patterns";
 
@@ -25,8 +26,8 @@ export async function uploadKnittingObject(
     .from(KNITTING_PATTERNS_BUCKET)
     .upload(objectPath, file, {
       contentType,
-      cacheControl: "3600",
-      upsert: options?.upsert ?? false,
+      cacheControl: SUPABASE_STORAGE_CACHE_CONTROL,
+      upsert: options?.upsert ?? true,
     });
 
   if (result.error) {

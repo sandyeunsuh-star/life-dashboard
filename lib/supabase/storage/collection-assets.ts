@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { logSupabaseError } from "../errors";
+import { SUPABASE_STORAGE_CACHE_CONTROL } from "./cache-control";
 
 export const COLLECTION_ASSETS_BUCKET = "collection-assets";
 
@@ -26,7 +27,7 @@ export async function uploadCollectionAsset(
     .from(COLLECTION_ASSETS_BUCKET)
     .upload(objectPath, file, {
       contentType: file.type || "image/webp",
-      cacheControl: "3600",
+      cacheControl: SUPABASE_STORAGE_CACHE_CONTROL,
       upsert: options?.upsert ?? false,
     });
 

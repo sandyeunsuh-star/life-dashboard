@@ -39,6 +39,8 @@ export function CollectionCoverArt({
           fill
           className="object-cover"
           sizes="(max-width: 768px) 100vw, 400px"
+          loading="lazy"
+          decoding="async"
         />
       </div>
     );

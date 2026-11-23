@@ -264,6 +264,8 @@ function CollectionsListTable({
                         fill
                         className="object-cover"
                         sizes="48px"
+                        loading="lazy"
+                        decoding="async"
                       />
                     </div>
                   ) : collection.preview_thumbnails[0] ? (

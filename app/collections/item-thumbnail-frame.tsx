@@ -53,6 +53,8 @@ export function ItemThumbnailFrame({
           fill
           className={imageClass}
           sizes={sizes}
+          loading="lazy"
+          decoding="async"
         />
       ) : (
         <div className={`absolute inset-0 ${pad}`}>
@@ -63,6 +65,8 @@ export function ItemThumbnailFrame({
               fill
               className={imageClass}
               sizes={sizes}
+              loading="lazy"
+              decoding="async"
             />
           </div>
         </div>
