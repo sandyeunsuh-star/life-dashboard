@@ -15,6 +15,8 @@ import {
 import { TagPill } from "@/lib/ui/tag-pill";
 import { METADATA_SEASONS, METADATA_YEARS } from "@/lib/supabase/metadata/constants";
 import type { Item } from "@/lib/supabase/types/item";
+import type { ItemGridDensity } from "@/lib/ui/item-grid-density";
+import { ItemGridDensityToggle } from "@/lib/ui/item-grid-density-toggle";
 import type { ViewLayout } from "@/lib/ui/view-layout";
 import { ViewLayoutToggle } from "@/lib/ui/view-layout-toggle";
 import { formInputMdClass, formLabelClass } from "@/lib/ui/form-styles";
@@ -26,6 +28,8 @@ type CollectionFilterBarProps = {
   filteredCount: number;
   viewLayout: ViewLayout;
   onViewLayoutChange: (next: ViewLayout) => void;
+  gridDensity: ItemGridDensity;
+  onGridDensityChange: (next: ItemGridDensity) => void;
   onChange: (next: ItemFilterState) => void;
   onClear: () => void;
 };
@@ -37,6 +41,8 @@ export function CollectionFilterBar({
   filteredCount,
   viewLayout,
   onViewLayoutChange,
+  gridDensity,
+  onGridDensityChange,
   onChange,
   onClear,
 }: CollectionFilterBarProps) {
@@ -118,6 +124,13 @@ export function CollectionFilterBar({
           onChange={onViewLayoutChange}
           ariaLabel="Items view layout"
         />
+
+        {viewLayout === "gallery" ? (
+          <ItemGridDensityToggle
+            value={gridDensity}
+            onChange={onGridDensityChange}
+          />
+        ) : null}
 
         <span className="w-full text-xs font-medium text-zinc-700 sm:ml-auto sm:w-auto">
           {filteredCount} of {items.length} items

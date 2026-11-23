@@ -35,6 +35,10 @@ import type { Collection } from "@/lib/supabase/types/collection";
 import type { CollectionMetadataRecord } from "@/lib/supabase/types/collection-metadata";
 import type { Item } from "@/lib/supabase/types/item";
 import {
+  itemGridDensityClasses,
+  useItemGridDensityPreference,
+} from "@/lib/ui/item-grid-density";
+import {
   useViewLayoutPreference,
   VIEW_LAYOUT_STORAGE,
 } from "@/lib/ui/view-layout";
@@ -84,6 +88,8 @@ export function CollectionDetail({
   const [itemViewLayout, setItemViewLayout] = useViewLayoutPreference(
     VIEW_LAYOUT_STORAGE.items,
   );
+  const [itemGridDensity, setItemGridDensity] = useItemGridDensityPreference();
+  const gridClasses = itemGridDensityClasses(itemGridDensity);
 
   const previewThumbnails = useMemo(
     () => items.slice(0, 4).map((item) => item.thumbnail_url),
@@ -324,6 +330,8 @@ export function CollectionDetail({
           filteredCount={filteredItems.length}
           viewLayout={itemViewLayout}
           onViewLayoutChange={setItemViewLayout}
+          gridDensity={itemGridDensity}
+          onGridDensityChange={setItemGridDensity}
           onChange={setFilters}
           onClear={() => setFilters(emptyItemFilters)}
         />
@@ -376,7 +384,7 @@ export function CollectionDetail({
             onOpenItem={setSelectedItem}
           />
         ) : (
-          <ul className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          <ul className={gridClasses.ul}>
             {filteredItems.map((item, index) => {
               const isSelected = selectedIds.has(item.id);
 
@@ -413,7 +421,7 @@ export function CollectionDetail({
                         alt={item.title}
                         fill
                         className="object-cover"
-                        sizes="(max-width: 640px) 50vw, 25vw"
+                        sizes={gridClasses.imageSizes}
                       />
                       <div
                         className={`absolute left-2 top-2 z-20 transition ${
@@ -457,10 +465,8 @@ export function CollectionDetail({
                         />
                       </div>
                     </div>
-                    <div className="p-3">
-                      <p className="truncate text-sm font-medium text-zinc-900">
-                        {item.title}
-                      </p>
+                    <div className={gridClasses.titlePad}>
+                      <p className={gridClasses.titleText}>{item.title}</p>
                     </div>
                   </div>
                 </li>
