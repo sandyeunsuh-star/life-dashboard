@@ -2,8 +2,15 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 
 import { WeeklyDashboard } from "@/app/weekly/weekly-dashboard";
+import { currentPeriodYm } from "@/lib/currents/period";
 import { formatSupabaseError } from "@/lib/supabase/errors";
+import { hasCurrentsForMonth } from "@/lib/supabase/queries/currents";
 import { listShipments } from "@/lib/supabase/queries/shipments";
+import { fetchTidyGuildSnapshot } from "@/lib/supabase/queries/tidy";
+import {
+  countPausedVaultItems,
+  listPausedVaultItems,
+} from "@/lib/supabase/queries/vault";
 import { getOrCreateUserSettings } from "@/lib/supabase/queries/user-settings";
 import {
   ensureCurrentWeekPlan,
@@ -24,12 +31,25 @@ async function WeeklyContent({ weekParam }: { weekParam?: string }) {
 
   const supabase = await createServerClientInstance();
 
-  const [{ data: weekStarts, error: weeksError }, settingsResult, shipmentsResult] =
-    await Promise.all([
-      listWeeklyPlanWeekStarts(supabase),
-      getOrCreateUserSettings(supabase),
-      listShipments(supabase),
-    ]);
+  const currentYm = currentPeriodYm();
+
+  const [
+    { data: weekStarts, error: weeksError },
+    settingsResult,
+    shipmentsResult,
+    vaultPausedResult,
+    vaultCountResult,
+    tidyGuildResult,
+    hasCurrents,
+  ] = await Promise.all([
+    listWeeklyPlanWeekStarts(supabase),
+    getOrCreateUserSettings(supabase),
+    listShipments(supabase),
+    listPausedVaultItems(supabase, 3),
+    countPausedVaultItems(supabase),
+    fetchTidyGuildSnapshot(supabase),
+    hasCurrentsForMonth(supabase, currentYm),
+  ]);
 
   if (weeksError) throw new Error(formatSupabaseError(weeksError));
   if (settingsResult.error) {
@@ -37,6 +57,12 @@ async function WeeklyContent({ weekParam }: { weekParam?: string }) {
   }
   if (shipmentsResult.error) {
     throw new Error(formatSupabaseError(shipmentsResult.error));
+  }
+  if (vaultPausedResult.error) {
+    throw new Error(formatSupabaseError(vaultPausedResult.error));
+  }
+  if (vaultCountResult.error) {
+    throw new Error(formatSupabaseError(vaultCountResult.error));
   }
 
   const defaultWeek = toDateString(getMondayOfWeek(new Date()));
@@ -73,6 +99,11 @@ async function WeeklyContent({ weekParam }: { weekParam?: string }) {
         weekStarts={allWeeks}
         settings={settingsResult.data!}
         initialShipments={shipmentsResult.data ?? []}
+        initialVaultPaused={vaultPausedResult.data ?? []}
+        vaultPausedCount={vaultCountResult.count ?? 0}
+        initialTidyTasks={tidyGuildResult.data?.tasks ?? []}
+        currentsCurrentYm={currentYm}
+        showCurrentsNudge={!hasCurrents}
       />
     </main>
   );

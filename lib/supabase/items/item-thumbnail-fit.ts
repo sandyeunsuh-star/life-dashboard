@@ -34,3 +34,10 @@ export function itemThumbnailFitFromMetadata(
   const isPaper = candidates.some((value) => isPaperItemLabel(value));
   return isPaper ? "paper" : "fitted";
 }
+
+/** Same signal Creative Room uses for full-bleed paper thumbnails. */
+export function isPaperItemFromMetadata(
+  metadata: Record<string, string> | null | undefined,
+): boolean {
+  return itemThumbnailFitFromMetadata(metadata) === "paper";
+}

@@ -15,6 +15,7 @@ import {
 import { EditCollectionMetadataDialog } from "@/app/collections/[slug]/edit-collection-metadata-dialog";
 import { CollectionMetadataBadges } from "@/app/collections/[slug]/collection-metadata-badges";
 import { CollectionCoverArt } from "@/app/collections/collection-cover-art";
+import { logCollectionCoverImageError } from "@/lib/ui/collection-cover-image";
 import { ItemThumbnailFrame } from "@/app/collections/item-thumbnail-frame";
 import { CollectionQuickActions } from "@/app/collections/collection-quick-actions";
 import { CollectionPaletteMiniBar } from "@/app/collections/collection-palette-mini-bar";
@@ -144,10 +145,11 @@ export function CollectionsDashboard({
           />
         ) : (
           <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredCollections.map((collection) => (
+            {filteredCollections.map((collection, index) => (
               <li key={collection.id}>
                 <CollectionGalleryCard
                   collection={collection}
+                  index={index}
                   onEditInfo={() => openCollectionInfo(collection)}
                 />
               </li>
@@ -186,11 +188,15 @@ export function CollectionsDashboard({
 
 function CollectionGalleryCard({
   collection,
+  index,
   onEditInfo,
 }: {
   collection: CollectionSummary;
+  index: number;
   onEditInfo: () => void;
 }) {
+  const imageLoading = index < 15 ? "eager" : "lazy";
+
   return (
     <div className="group flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-sm transition hover:border-zinc-300 hover:shadow-md">
       <Link
@@ -202,6 +208,8 @@ function CollectionGalleryCard({
           previewThumbnails={collection.preview_thumbnails}
           alt={`${collection.name} cover`}
           aspectClass="aspect-[16/10]"
+          imageLoading={imageLoading}
+          imageContext={`designer-gallery:${collection.slug}`}
         />
         <CollectionPaletteMiniBar metadata={collection.metadata} />
         <div className="flex flex-1 flex-col p-4 pb-3">
@@ -244,8 +252,13 @@ function CollectionsListTable({
         <span className="text-right">Items</span>
       </div>
       <ul className="divide-y divide-zinc-100">
-        {collections.map((collection) => {
+        {collections.map((collection, index) => {
           const album = parseCollectionMetadata(collection.metadata);
+          const imageLoading = index < 15 ? "eager" : "lazy";
+          const coverSrc =
+            collection.cover_image_url?.trim() ||
+            collection.preview_thumbnails[0]?.trim() ||
+            null;
           return (
             <li
               key={collection.id}
@@ -256,25 +269,40 @@ function CollectionsListTable({
                 className="flex min-w-0 flex-1 items-center gap-3 md:grid md:grid-cols-[56px_minmax(0,1.4fr)_minmax(0,0.7fr)_minmax(0,0.7fr)_minmax(0,0.8fr)] md:gap-3"
               >
                 <div className="flex flex-col gap-1">
-                  {collection.cover_image_url ? (
-                    <div className="relative size-12 shrink-0 overflow-hidden rounded-md bg-zinc-100">
-                      <Image
-                        src={collection.cover_image_url}
+                  {coverSrc ? (
+                    collection.cover_image_url?.trim() ? (
+                      <div className="relative size-12 shrink-0 overflow-hidden rounded-md bg-zinc-100">
+                        <Image
+                          src={coverSrc}
+                          alt=""
+                          fill
+                          className="object-cover"
+                          sizes="48px"
+                          loading={imageLoading}
+                          decoding="async"
+                          onError={() =>
+                            logCollectionCoverImageError(
+                              coverSrc,
+                              `designer-list:${collection.slug}`,
+                            )
+                          }
+                        />
+                      </div>
+                    ) : (
+                      <ItemThumbnailFrame
+                        src={coverSrc}
                         alt=""
-                        fill
-                        className="object-cover"
                         sizes="48px"
-                        loading="lazy"
-                        decoding="async"
+                        variant="inline"
+                        imageLoading={imageLoading}
+                        onImageError={(src) =>
+                          logCollectionCoverImageError(
+                            src,
+                            `designer-list:${collection.slug}`,
+                          )
+                        }
                       />
-                    </div>
-                  ) : collection.preview_thumbnails[0] ? (
-                    <ItemThumbnailFrame
-                      src={collection.preview_thumbnails[0]}
-                      alt=""
-                      sizes="48px"
-                      variant="inline"
-                    />
+                    )
                   ) : (
                     <div className="size-12 shrink-0 rounded-md bg-zinc-50" />
                   )}

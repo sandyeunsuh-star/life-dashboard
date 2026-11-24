@@ -1,7 +1,13 @@
 "use client";
 
 import { Plus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+import { createBrowserClientInstance } from "@/lib/supabase/client";
+import {
+  fetchPatternRewardLinks,
+  type PatternRewardLink,
+} from "@/lib/supabase/queries/tidy-reward-bridge";
 
 import {
   emptySewingFilters,
@@ -38,16 +44,31 @@ export function SewingCornerDashboard({
   const [columns, setColumns] = useSewingGridDensity();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<SewingPatternRow | null>(null);
+  const [rewardLinks, setRewardLinks] = useState<
+    Record<string, PatternRewardLink>
+  >({});
 
-  const libraryPatterns = useMemo(
-    () => patterns.filter((p) => !p.is_wishlist),
-    [patterns],
-  );
   const wishlistPatterns = useMemo(
     () => patterns.filter((p) => p.is_wishlist),
     [patterns],
   );
 
+  useEffect(() => {
+    if (section !== "wishlist" || wishlistPatterns.length === 0) {
+      setRewardLinks({});
+      return;
+    }
+    const ids = wishlistPatterns.map((p) => p.id);
+    const supabase = createBrowserClientInstance();
+    void fetchPatternRewardLinks(supabase, [], ids).then(({ sewing }) => {
+      setRewardLinks(sewing);
+    });
+  }, [section, wishlistPatterns]);
+
+  const libraryPatterns = useMemo(
+    () => patterns.filter((p) => !p.is_wishlist),
+    [patterns],
+  );
   const scoped = section === "wishlist" ? wishlistPatterns : libraryPatterns;
 
   const filtered = useMemo(
@@ -159,6 +180,15 @@ export function SewingCornerDashboard({
                 key={pattern.id}
                 pattern={pattern}
                 wishlistView={section === "wishlist"}
+                rewardLink={rewardLinks[pattern.id] ?? null}
+                onRewardLinkChange={(patternId, link) => {
+                  setRewardLinks((prev) => {
+                    const next = { ...prev };
+                    if (link) next[patternId] = link;
+                    else delete next[patternId];
+                    return next;
+                  });
+                }}
                 onOpen={openEdit}
                 onUpdated={handleSaved}
               />

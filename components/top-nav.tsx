@@ -18,10 +18,16 @@ export function TopNav() {
   const pathname = usePathname() ?? "/";
 
   const weeklyActive = pathname === "/";
+  const tidyActive =
+    pathname === "/tidy-guild" || pathname.startsWith("/tidy-guild/");
+  const vaultActive =
+    pathname === "/vault" || pathname.startsWith("/vault/");
   const designerActive =
     pathname === "/designer" ||
     pathname.startsWith("/designer/") ||
     pathname.startsWith("/collections/");
+  const currentsActive =
+    pathname === "/currents" || pathname.startsWith("/currents/");
 
   return (
     <header className="sticky top-0 z-40 border-b border-zinc-200/80 bg-white/95 backdrop-blur-sm">
@@ -40,8 +46,17 @@ export function TopNav() {
             <Link href="/" className={navLinkClass(weeklyActive)}>
               Weekly
             </Link>
+            <Link href="/tidy-guild" className={navLinkClass(tidyActive)}>
+              Tidy Guild
+            </Link>
+            <Link href="/vault" className={navLinkClass(vaultActive)}>
+              The Vault
+            </Link>
             <Link href="/designer" className={navLinkClass(designerActive)}>
               Creative Room
+            </Link>
+            <Link href="/currents" className={navLinkClass(currentsActive)}>
+              Currents
             </Link>
           </nav>
         </div>

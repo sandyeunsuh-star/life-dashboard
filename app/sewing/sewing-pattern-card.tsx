@@ -11,10 +11,17 @@ import { moveSewingPatternToLibrary } from "@/lib/supabase/queries/sewing-patter
 import { resolveSewingCoverUrl } from "@/lib/supabase/storage/pattern-covers";
 import { createSewingSignedUrl } from "@/lib/supabase/storage/sewing-patterns";
 import type { SewingPatternRow } from "@/lib/supabase/types/sewing-pattern";
+import { PatternRewardBridge } from "@/app/designer/pattern-reward-bridge";
+import type { PatternRewardLink } from "@/lib/supabase/queries/tidy-reward-bridge";
 
 type SewingPatternCardProps = {
   pattern: SewingPatternRow;
   wishlistView: boolean;
+  rewardLink?: PatternRewardLink | null;
+  onRewardLinkChange?: (
+    patternId: string,
+    link: PatternRewardLink | null,
+  ) => void;
   onOpen: (pattern: SewingPatternRow) => void;
   onUpdated: (pattern: SewingPatternRow) => void;
 };
@@ -28,6 +35,8 @@ function specLine(p: SewingPatternRow): string {
 export function SewingPatternCard({
   pattern,
   wishlistView,
+  rewardLink = null,
+  onRewardLinkChange,
   onOpen,
   onUpdated,
 }: SewingPatternCardProps) {
@@ -170,6 +179,17 @@ export function SewingPatternCard({
         <div className="mt-auto flex flex-wrap gap-2">
           {wishlistView || pattern.is_wishlist ? (
             <>
+              {wishlistView && onRewardLinkChange ? (
+                <PatternRewardBridge
+                  patternId={pattern.id}
+                  title={pattern.title}
+                  imageUrl={coverUrl}
+                  purchaseUrl={pattern.purchase_url}
+                  source="sewing"
+                  link={rewardLink}
+                  onLinkChange={onRewardLinkChange}
+                />
+              ) : null}
               {pattern.purchase_url?.trim() ? (
                 <button
                   type="button"

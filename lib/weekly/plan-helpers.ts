@@ -19,6 +19,20 @@ export function normalizeWeeklyDays(raw: unknown): WeeklyDays {
       .filter((t) => t && typeof t === "object")
       .map((t) => {
         const row = t as Record<string, unknown>;
+        const pointsRaw = row.points;
+        const points =
+          typeof pointsRaw === "number" && pointsRaw > 0
+            ? Math.floor(pointsRaw)
+            : 0;
+        const tidyId =
+          typeof row.tidy_task_id === "string" && row.tidy_task_id
+            ? row.tidy_task_id
+            : null;
+        const claimRaw = row.anytime_claim_count;
+        const anytime_claim_count =
+          typeof claimRaw === "number" && claimRaw > 0
+            ? Math.floor(claimRaw)
+            : 0;
         return {
           id:
             typeof row.id === "string" && row.id
@@ -26,6 +40,9 @@ export function normalizeWeeklyDays(raw: unknown): WeeklyDays {
               : crypto.randomUUID(),
           text: typeof row.text === "string" ? row.text : "",
           checked: Boolean(row.checked),
+          ...(points > 0 ? { points } : {}),
+          ...(tidyId ? { tidy_task_id: tidyId } : {}),
+          ...(anytime_claim_count > 0 ? { anytime_claim_count } : {}),
         } satisfies WeeklyTask;
       });
   }
@@ -72,8 +89,8 @@ export function collectUncheckedTasks(days: WeeklyDays): WeeklyTask[] {
     for (const task of days[day] ?? []) {
       if (!task.checked && task.text.trim()) {
         out.push({
+          ...task,
           id: crypto.randomUUID(),
-          text: task.text,
           checked: false,
         });
       }

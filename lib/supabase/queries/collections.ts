@@ -284,48 +284,176 @@ export function collectionMetadataInputToRecord(
   return serializeCollectionMetadata(normalizeCollectionMetadata(metadata));
 }
 
-export async function listCollectionsForDashboard(supabase: SupabaseClient) {
-  const { data: collections, error } = await listCollections(supabase);
-  if (error || !collections) {
-    return { data: null, error };
+type CollectionWithItemCount = Collection & {
+  items: { count: number }[];
+};
+
+const DASHBOARD_ITEM_PAGE_SIZE = 1000;
+const DASHBOARD_PREVIEW_CONCURRENCY = 12;
+
+/** Paginate through every item row (ids only) — accurate counts above the 1,000-row cap. */
+async function fetchItemCountsByCollection(
+  supabase: SupabaseClient,
+): Promise<{ data: Map<string, number> | null; error: PostgrestError | null }> {
+  const counts = new Map<string, number>();
+
+  for (let offset = 0; ; offset += DASHBOARD_ITEM_PAGE_SIZE) {
+    const page = await supabase
+      .from("items")
+      .select("collection_id")
+      .order("id", { ascending: true })
+      .range(offset, offset + DASHBOARD_ITEM_PAGE_SIZE - 1);
+
+    if (page.error) {
+      logSupabaseError("listCollectionsForDashboard item counts", page.error);
+      return { data: null, error: page.error };
+    }
+
+    const batch = page.data ?? [];
+    if (batch.length === 0) {
+      break;
+    }
+
+    for (const row of batch) {
+      const collectionId = row.collection_id as string;
+      counts.set(collectionId, (counts.get(collectionId) ?? 0) + 1);
+    }
+
+    if (batch.length < DASHBOARD_ITEM_PAGE_SIZE) {
+      break;
+    }
   }
 
+  return { data: counts, error: null };
+}
+
+async function runInBatches<T>(
+  items: T[],
+  batchSize: number,
+  fn: (item: T) => Promise<void>,
+): Promise<void> {
+  for (let i = 0; i < items.length; i += batchSize) {
+    const slice = items.slice(i, i + batchSize);
+    await Promise.all(slice.map((item) => fn(item)));
+  }
+}
+
+/** Oldest → newest preview thumbs per collection (at most 4), each query capped at 4 rows. */
+async function fetchPreviewThumbnailsByCollection(
+  supabase: SupabaseClient,
+  collectionIds: string[],
+): Promise<{
+  data: Map<string, string[]> | null;
+  error: PostgrestError | null;
+}> {
+  const previews = new Map<string, string[]>();
+  let firstError: PostgrestError | null = null;
+
+  await runInBatches(collectionIds, DASHBOARD_PREVIEW_CONCURRENCY, async (collectionId) => {
+    const { data, error } = await supabase
+      .from("items")
+      .select("thumbnail_url")
+      .eq("collection_id", collectionId)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .limit(4);
+
+    if (error) {
+      logSupabaseError("listCollectionsForDashboard previews", error);
+      if (!firstError) {
+        firstError = error;
+      }
+      return;
+    }
+
+    const urls = (data ?? [])
+      .map((row) => row.thumbnail_url?.trim())
+      .filter((url): url is string => Boolean(url));
+
+    if (urls.length > 0) {
+      previews.set(collectionId, urls);
+    }
+  });
+
+  if (firstError && previews.size === 0) {
+    return { data: null, error: firstError };
+  }
+
+  return { data: previews, error: null };
+}
+
+function itemCountFromEmbed(items: unknown): number | null {
+  if (items == null) {
+    return null;
+  }
+  if (Array.isArray(items) && items.length > 0) {
+    const raw = (items[0] as { count?: unknown }).count;
+    if (typeof raw === "number" && Number.isFinite(raw)) {
+      return raw;
+    }
+  }
+  if (typeof items === "object" && "count" in (items as object)) {
+    const raw = (items as { count: unknown }).count;
+    if (typeof raw === "number" && Number.isFinite(raw)) {
+      return raw;
+    }
+  }
+  return null;
+}
+
+export async function listCollectionsForDashboard(supabase: SupabaseClient) {
   const { user, error: authError } = await requireAuthUser(supabase);
   if (authError || !user) {
     return { data: null, error: authError };
   }
 
-  const itemsResult = await supabase
-    .from("items")
-    .select("collection_id, thumbnail_url, created_at")
+  const collectionsResult = await supabase
+    .from("collections")
+    .select(`${COLLECTION_SELECT}, items ( count )`)
     .eq("user_id", user.id)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .returns<CollectionWithItemCount[]>();
 
-  if (itemsResult.error) {
-    logSupabaseError("listCollectionsForDashboard items", itemsResult.error);
-    return { data: null, error: itemsResult.error };
+  if (collectionsResult.error) {
+    logSupabaseError("listCollectionsForDashboard collections", collectionsResult.error);
+    return { data: null, error: collectionsResult.error };
   }
 
-  const counts = new Map<string, number>();
-  const previews = new Map<string, string[]>();
-
-  for (const row of itemsResult.data ?? []) {
-    const collectionId = row.collection_id as string;
-    counts.set(collectionId, (counts.get(collectionId) ?? 0) + 1);
-
-    const thumbs = previews.get(collectionId) ?? [];
-    const url = row.thumbnail_url as string | null;
-    if (url && thumbs.length < 4) {
-      thumbs.push(url);
-      previews.set(collectionId, thumbs);
-    }
+  const collections = collectionsResult.data ?? [];
+  if (collections.length === 0) {
+    return { data: [], error: null };
   }
 
-  const summaries: CollectionSummary[] = collections.map((collection) => ({
-    ...collection,
-    item_count: counts.get(collection.id) ?? 0,
-    preview_thumbnails: previews.get(collection.id) ?? [],
-  }));
+  const collectionIds = collections.map((row) => row.id);
+
+  const [countsResult, previewsResult] = await Promise.all([
+    fetchItemCountsByCollection(supabase),
+    fetchPreviewThumbnailsByCollection(supabase, collectionIds),
+  ]);
+
+  if (countsResult.error) {
+    return { data: null, error: countsResult.error };
+  }
+  if (previewsResult.error) {
+    return { data: null, error: previewsResult.error };
+  }
+
+  const countsByCollection = countsResult.data ?? new Map<string, number>();
+  const previewsByCollection = previewsResult.data ?? new Map<string, string[]>();
+
+  const summaries: CollectionSummary[] = collections.map((row) => {
+    const { items: embeddedItems, ...collectionFields } = row;
+    const collection = normalizeCollectionRow(collectionFields);
+    const embeddedCount = itemCountFromEmbed(embeddedItems);
+    const paginatedCount = countsByCollection.get(collection.id) ?? 0;
+    const item_count = Math.max(embeddedCount ?? 0, paginatedCount);
+
+    return {
+      ...collection,
+      item_count,
+      preview_thumbnails: previewsByCollection.get(collection.id) ?? [],
+    };
+  });
 
   return { data: summaries, error: null };
 }

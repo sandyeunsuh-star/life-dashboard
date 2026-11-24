@@ -24,7 +24,15 @@ export type WeeklyTask = {
   id: string;
   text: string;
   checked: boolean;
+  /** Tidy Guild points when checked (weekly-only tasks). Default 0 = hidden. */
+  points?: number;
+  /** Linked tidy_tasks.id — completion sync, no double points from weekly. */
+  tidy_task_id?: string | null;
+  /** Same-day anytime claims pinned on Today's column. */
+  anytime_claim_count?: number;
 };
+
+export const WEEKLY_TIDY_POINT_PRESETS = [0, 10, 20, 30] as const;
 
 export type WeeklyDays = Record<DayKey, WeeklyTask[]>;
 

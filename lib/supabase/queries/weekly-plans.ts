@@ -14,6 +14,7 @@ import {
   normalizeRecurringTemplate,
   normalizeWeeklyDays,
 } from "@/lib/weekly/plan-helpers";
+import { prepareWeeklyDaysForStorage } from "@/lib/weekly/serialize-days";
 
 import { logSupabaseError } from "../errors";
 import { requireAuthUser } from "../require-auth-user";
@@ -86,7 +87,7 @@ export async function upsertWeeklyPlanDays(
   const { data, error } = await supabase
     .from("weekly_plans")
     .update({
-      days,
+      days: prepareWeeklyDaysForStorage(days),
       updated_at: new Date().toISOString(),
     })
     .eq("id", planId)
@@ -102,8 +103,10 @@ export async function upsertWeeklyPlanDays(
   return { data: normalizePlan(data as WeeklyPlanRow), error: null };
 }
 
-export async function ensureCurrentWeekPlan(supabase: SupabaseClient) {
-  const weekStart = toDateString(getMondayOfWeek(new Date()));
+export async function ensureWeekPlanForWeekStart(
+  supabase: SupabaseClient,
+  weekStart: string,
+) {
   const existing = await getWeeklyPlanByWeekStart(supabase, weekStart);
   if (existing.error) return existing;
   if (existing.data) return existing;
@@ -118,6 +121,11 @@ export async function ensureCurrentWeekPlan(supabase: SupabaseClient) {
   );
   const days = buildDaysFromTemplate(template);
   return createWeeklyPlan(supabase, weekStart, days);
+}
+
+export async function ensureCurrentWeekPlan(supabase: SupabaseClient) {
+  const weekStart = toDateString(getMondayOfWeek(new Date()));
+  return ensureWeekPlanForWeekStart(supabase, weekStart);
 }
 
 async function createWeeklyPlan(

@@ -1,6 +1,7 @@
 import Image from "next/image";
 
 import type { ItemThumbnailFit } from "@/lib/supabase/items/item-thumbnail-fit";
+import { logCollectionCoverImageError } from "@/lib/ui/collection-cover-image";
 
 type ItemThumbnailFrameProps = {
   src: string;
@@ -12,6 +13,8 @@ type ItemThumbnailFrameProps = {
   fit?: ItemThumbnailFit;
   paddingClass?: string;
   className?: string;
+  imageLoading?: "lazy" | "eager";
+  onImageError?: (src: string) => void;
 };
 
 export function ItemThumbnailFrame({
@@ -22,7 +25,16 @@ export function ItemThumbnailFrame({
   fit = "fitted",
   paddingClass,
   className = "",
+  imageLoading = "lazy",
+  onImageError,
 }: ItemThumbnailFrameProps) {
+  const reportError = (failedSrc: string) => {
+    if (onImageError) {
+      onImageError(failedSrc);
+    } else {
+      logCollectionCoverImageError(failedSrc, "item-thumbnail");
+    }
+  };
   const isPaper = fit === "paper";
 
   const pad = isPaper
@@ -53,8 +65,9 @@ export function ItemThumbnailFrame({
           fill
           className={imageClass}
           sizes={sizes}
-          loading="lazy"
+          loading={imageLoading}
           decoding="async"
+          onError={() => reportError(src)}
         />
       ) : (
         <div className={`absolute inset-0 ${pad}`}>
@@ -65,8 +78,9 @@ export function ItemThumbnailFrame({
               fill
               className={imageClass}
               sizes={sizes}
-              loading="lazy"
+              loading={imageLoading}
               decoding="async"
+              onError={() => reportError(src)}
             />
           </div>
         </div>

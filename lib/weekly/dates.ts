@@ -53,13 +53,11 @@ export function formatWeekRange(weekStartIso: string): string {
   return `Week of ${formatShort(monday)} – ${formatShort(sunday)}`;
 }
 
-export function todayDayKey(weekStartIso: string): DayKey | null {
-  const today = new Date();
-  const todayMid = new Date(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate(),
-  );
+export function todayDayKey(
+  weekStartIso: string,
+  now: Date = new Date(),
+): DayKey | null {
+  const todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const monday = parseDateString(weekStartIso);
   const diff = Math.round(
     (todayMid.getTime() - monday.getTime()) / (1000 * 60 * 60 * 24),

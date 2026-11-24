@@ -11,10 +11,17 @@ import { moveKnittingPatternToLibrary } from "@/lib/supabase/queries/knitting-pa
 import { resolveKnittingCoverUrl } from "@/lib/supabase/storage/pattern-covers";
 import { createKnittingSignedUrl } from "@/lib/supabase/storage/knitting-patterns";
 import type { KnittingPatternRow } from "@/lib/supabase/types/knitting-pattern";
+import { PatternRewardBridge } from "@/app/designer/pattern-reward-bridge";
+import type { PatternRewardLink } from "@/lib/supabase/queries/tidy-reward-bridge";
 
 type KnittingPatternCardProps = {
   pattern: KnittingPatternRow;
   wishlistView: boolean;
+  rewardLink?: PatternRewardLink | null;
+  onRewardLinkChange?: (
+    patternId: string,
+    link: PatternRewardLink | null,
+  ) => void;
   onOpen: (pattern: KnittingPatternRow) => void;
   onUpdated: (pattern: KnittingPatternRow) => void;
 };
@@ -26,6 +33,8 @@ function specLine(p: KnittingPatternRow): string {
 export function KnittingPatternCard({
   pattern,
   wishlistView,
+  rewardLink = null,
+  onRewardLinkChange,
   onOpen,
   onUpdated,
 }: KnittingPatternCardProps) {
@@ -139,6 +148,17 @@ export function KnittingPatternCard({
         <div className="mt-auto flex flex-wrap gap-2">
           {wishlistView || pattern.is_wishlist ? (
             <>
+              {wishlistView && onRewardLinkChange ? (
+                <PatternRewardBridge
+                  patternId={pattern.id}
+                  title={pattern.title}
+                  imageUrl={coverUrl}
+                  purchaseUrl={pattern.purchase_url}
+                  source="knitting"
+                  link={rewardLink}
+                  onLinkChange={onRewardLinkChange}
+                />
+              ) : null}
               {pattern.purchase_url?.trim() ? (
                 <button
                   type="button"
