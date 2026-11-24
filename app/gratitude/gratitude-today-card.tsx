@@ -228,7 +228,7 @@ export function GratitudeTodayCard({
           onPendingFileChange={setPendingFile}
         />
 
-        <motion classNameName="space-y-2">
+        <div className="space-y-2">
           <p className="text-xs font-semibold text-zinc-800">3 daily glimmers</p>
           <p className="text-xs text-zinc-500">
             Tiny happy moments — fill as many as you like.
@@ -251,7 +251,7 @@ export function GratitudeTodayCard({
             placeholder="Glimmer 3"
             className={inputClass}
           />
-        </motion>
+        </div>
       </div>
 
       <footer className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-100 pt-4">

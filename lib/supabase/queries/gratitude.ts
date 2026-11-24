@@ -119,7 +119,7 @@ export type SaveGratitudeResult = {
 export async function saveGratitudeEntry(
   supabase: SupabaseClient,
   input: UpsertGratitudeEntryInput,
-): Promise<{ data: SaveGratitudeResult | null; error: PostgrestError | null }> {
+): Promise<{ data: SaveGratitudeResult | null; error: { message: string } | null }> {
   const { user, error: authError } = await requireAuthUser(supabase);
   if (authError || !user) {
     return { data: null, error: authError };
